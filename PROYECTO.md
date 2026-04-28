@@ -27,98 +27,40 @@ Definir la arquitectura del sistema y como interactuan sus diferentes componente
 
 ### Funcionales
 
-RF-01: Autenticación
-Login con mail y contraseña
-Sesión persistente
-Roles (admin, usuarios)
-
-RF-02: Gestión de Materias
-Ver cursando/aprobadas/disponibles
-Sistema de correlatividades
-Planear Inscripción (validando correlatividades)
-Horas de electivas cursadas
-
-RF-03: Calculadora de Promedio
-Promedio actual
-Porcentaje de Ingeniero
-
-RF04:
-El sistema debe proveer una interfaz de chat conversacional donde el usuario puede realizar preguntas en lenguaje natural sobre cualquier tema relacionado con la facultad (correlatividades, trámites, fechas, horarios, novedades).
-
-RF05:
-El chatbot debe mantener contexto conversacional dentro de una misma sesión, permitiendo preguntas de seguimiento sin necesidad de repetir información previa.
-
-RF06:
-Cada respuesta del chatbot debe incluir las fuentes de donde se obtuvo la información (URL, documento PDF, post de Instagram, etc.), permitiendo al usuario verificar la respuesta.
-
-RF07:
-Si el agente no encuentra información suficiente en sus herramientas para responder una consulta, debe indicar explícitamente que no tiene esa información disponible en lugar de generar una respuesta no fundamentada.
-
-RF08 — El sistema debe ejecutar un pipeline de ingesta automática que scrapee periódicamente las fuentes de datos configuradas.
-
-RF09: Novedades 
-Actualización automática
-
-RF-10: Calendario Académico
-Vista mensual
-Lista próximos eventos, mesas de examen, feriados
-Filtros por tipo
-
-RF-11 Perfil
-Datos personales
-Legajo, carrera, email
-Historial académico
-
-RF-12: Scrapers
-Materias + correlatividades
-Profesores
-Instagram
-Calendario
-Ejecución periódica
-Deduplicación
+| ID | Categoría | Descripción |
+|----|-----------|-------------|
+| RF-01 | Autenticación | Login con mail y contraseña. Sesión persistente. Roles (admin, usuarios). |
+| RF-02 | Gestión de Materias | Ver cursando/aprobadas/disponibles. Sistema de correlatividades. Planear inscripción (validando correlatividades). Horas de electivas cursadas. |
+| RF-03 | Calculadora de Promedio | Promedio actual. Porcentaje de Ingeniero. |
+| RF-04 | IA y Agentes | El sistema debe proveer una interfaz de chat conversacional donde el usuario puede realizar preguntas en lenguaje natural sobre cualquier tema relacionado con la facultad (correlatividades, trámites, fechas, horarios, novedades). |
+| RF-05 | IA y Agentes | El chatbot debe mantener contexto conversacional dentro de una misma sesión, permitiendo preguntas de seguimiento sin necesidad de repetir información previa. |
+| RF-06 | IA y Agentes | Cada respuesta del chatbot debe incluir las fuentes de donde se obtuvo la información (URL, documento PDF, post de Instagram, etc.), permitiendo al usuario verificar la respuesta. |
+| RF-07 | IA y Agentes | Si el agente no encuentra información suficiente en sus herramientas para responder una consulta, debe indicar explícitamente que no tiene esa información disponible en lugar de generar una respuesta no fundamentada. |
+| RF-08 | Ingesta | El sistema debe ejecutar un pipeline de ingesta automática que scrapee periódicamente las fuentes de datos configuradas. |
+| RF-09 | Novedades | Actualización automática. |
+| RF-10 | Calendario Académico | Vista mensual. Lista próximos eventos, mesas de examen, feriados. Filtros por tipo. |
+| RF-11 | Perfil | Datos personales. Legajo, carrera, email. Historial académico. |
+| RF-12 | Scrapers | Materias + correlatividades. Profesores. Instagram. Calendario. Ejecución periódica. Deduplicación. |
 
 ### No Funcionales
 
-RNF-01: Usabilidad
-Interfaz intuitiva
-Responsive
-Navegación clara
+| ID | Categoría | Descripción |
+|----|-----------|-------------|
+| RNF-01 | Usabilidad | Interfaz intuitiva. Responsive. Navegación clara. |
+| RNF-02 | Seguridad | Contraseñas hasheadas. Sesiones seguras. Sin credenciales hardcodeadas. |
+| RNF-03 | Escalabilidad | Múltiples usuarios concurrentes. BD optimizada (índices). Cache en usuario (Next.js). |
+| RNF-04 | Autenticación | Autenticación mediante Google OAuth 2.0. El sistema debe permitir que los usuarios inicien sesión utilizando su cuenta de Google a través del protocolo OAuth 2.0. El acceso debe estar restringido a cuentas pertenecientes al dominio institucional @frro.utn.edu.ar, rechazando cualquier cuenta externa. |
+| RNF-05 | Autenticación | Gestión de sesión. Una vez autenticado, el sistema debe mantener la sesión del usuario activa mediante un token seguro. La sesión debe expirar tras un período de inactividad configurable y el usuario debe poder cerrarla manualmente. |
+| RNF-06 | Autenticación | Control de acceso por rol. El sistema debe asignar un rol al usuario en el momento del login (usuario, administrador) en función de atributos provistos por el proveedor de identidad o de una tabla de roles interna. Las funcionalidades disponibles deben ajustarse según el rol asignado. |
+| RNF-07 | Ingesta | La frecuencia de ingesta debe ser configurable por fuente (ej: sitio web cada 24hs, Instagram cada 6-12hs, calendario semanalmente). |
+| RNF-08 | Ingesta | Cada ejecución de ingesta debe registrarse en un log de auditoría con: fuente procesada, timestamp de inicio y fin, cantidad de chunks creados/actualizados, y errores encontrados. |
+| RNF-09 | Ingesta | El contenido ingestado debe pasar por un pipeline de procesamiento: extracción de texto crudo, limpieza y normalización, división en chunks con solapamiento configurable, generación de embeddings, e insertado en la base vectorial con metadata asociada (fuente, fecha, categoría, hash). |
+| RNF-10 | IA y Agentes | El agente debe seguir una arquitectura agéntica con acceso a herramientas (tools). Ante cada consulta, el agente decide qué herramienta(s) utilizar para construir la respuesta. |
+| RNF-11 | Costos | El sistema debe imponer un límite configurable de tokens por consulta y por sesión para controlar costos de API del LLM. |
+| RNF-12 | Precisión | Las respuestas del chatbot deben generarse exclusivamente a partir de información recuperada de las fuentes indexadas. El system prompt debe instruir al modelo a no inventar información y a citar sus fuentes. |
+| RNF-13 | Calidad | Los embeddings deben generarse con un modelo que soporte contenido en español. Se debe evaluar la calidad de recuperación con un set de test de consultas reales en español argentino antes de elegir el modelo definitivo. |
 
-RNF-02: Seguridad
-Contraseñas hasheadas
-Sesiones seguras
-Sin credenciales hardcodeadas
-
-RNF-03: Escalabilidad
-Múltiples usuarios concurrentes
-BD optimizada (índices)
-Cache en en usuario (Nextjs)
-
-RNF04 — Autenticación mediante Google OAuth 2.0
-El sistema debe permitir que los usuarios inicien sesión utilizando su cuenta de Google a través del protocolo OAuth 2.0. 
-El acceso debe estar restringido a cuentas pertenecientes al dominio institucional @frro.utn.edu.ar, rechazando cualquier cuenta externa.
-
-RNF05 — Gestión de sesión
-Una vez autenticado, el sistema debe mantener la sesión del usuario activa mediante un token seguro.
-La sesión debe expirar tras un período de inactividad configurable y el usuario debe poder cerrarla manualmente.
-
-RNF06 — Control de acceso por rol
-El sistema debe asignar un rol al usuario en el momento del login (usuario, administrador) en función de atributos provistos por el proveedor de identidad o de una tabla de roles interna.
-Las funcionalidades disponibles deben ajustarse según el rol asignado.
-
-RNF07 — La frecuencia de ingesta debe ser configurable por fuente (ej: sitio web cada 24hs, Instagram cada 6-12hs, calendario semanalmente).
-
-RNF08 — Cada ejecución de ingesta debe registrarse en un log de auditoría con: fuente procesada, timestamp de inicio y fin, cantidad de chunks creados/actualizados, y errores encontrados.
-
-RF09 — El contenido ingestado debe pasar por un pipeline de procesamiento: extracción de texto crudo, limpieza y normalización, división en chunks con solapamiento configurable, 
-generación de embeddings, e insertado en la base vectorial con metadata asociada (fuente, fecha, categoría, hash).
-
-RF10 — El agente debe seguir una arquitectura agéntica con acceso a herramientas (tools). Ante cada consulta, el agente decide qué herramienta(s) utilizar para construir la respuesta.0
-RNF11 — El sistema debe imponer un límite configurable de tokens por consulta y por sesión para controlar costos de API del LLM.
-
-RNF12 — Las respuestas del chatbot deben generarse exclusivamente a partir de información recuperada de las fuentes indexadas. El system prompt debe instruir al modelo a no inventar información y a citar sus fuentes.
-
-RN13 — Los embeddings deben generarse con un modelo que soporte contenido en español. Se debe evaluar la calidad de recuperación con un set de test de consultas reales en español argentino antes de elegir el modelo definitivo.
+Solo unifiqué el formato de los IDs (todos con guión), corregí RN13 → RNF-13, y puse todo en tablas con la columna de categoría. Cero cambios de contenido.
 
 ****
 
