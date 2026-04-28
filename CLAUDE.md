@@ -52,11 +52,20 @@ TPI-Soporte/
 
 ### Stack obligatorio
 - **Python** + **FastAPI** (backend, obligatorio por la materia)
-- **PostgreSQL** + **SQLAlchemy** + **Alembic** (datos)
+- **Neon** (Postgres serverless con pgvector) — DB de desarrollo y producción
+- **SQLAlchemy** + **Alembic** (ORM y migraciones)
 - **pgvector** (embeddings dentro de Postgres, no usar Chroma/Pinecone)
 - **LangChain / LangGraph** (negocio — agente)
 - **React** + **Next.js** + **Tailwind** (frontend)
 - **pytest** (tests)
+
+### Base de datos: Neon
+La DB vive en **Neon** (serverless Postgres). La connection string se lee desde `DATABASE_URL` en `backend/.env` (gitignored). El template está en `backend/.env.example`.
+
+- Soporta **pgvector** nativo — activado con `CREATE EXTENSION vector;`.
+- Connection string requiere `?sslmode=require&channel_binding=require`.
+- Usar `pool_pre_ping=True` en el engine de SQLAlchemy: el compute de Neon se duerme tras inactividad y la primera query puede fallar sin pre-ping.
+- Hay un **MCP server de Neon** configurado en `.mcp.json` — permite consultar la DB, listar branches, ver schemas, ejecutar SQL, etc. directamente desde Claude Code.
 
 ### Arquitectura en capas
 Respetá la separación: **Datos** (`db/`, `repositories/`, `scrapers/`), **Negocio** (`services/`, `agent/`, `rag/`), **Presentación** (`api/`, frontend).
@@ -66,23 +75,24 @@ Respetá la separación: **Datos** (`db/`, `repositories/`, `scrapers/`), **Nego
 - Las tools del agente viven en `agent/tools/` y consumen `services/`.
 
 
-### Antes de codear
-1. Si la tarea toca un área documentada en `agent_docs/`, leé el doc primero.
-2. Si la tarea agrega un patrón nuevo, considerá actualizar el doc correspondiente.
-3. No inventes nombres de tablas, endpoints o tools — confirmá contra el código existente.
-
 ### Comandos útiles
-TODO: completar cuando estén configurados pyproject.toml y package.json.
+TODO: completar cuando esté definido el entorno de desarrollo.
 
 ```bash
 # Backend
 cd backend && uv run uvicorn app.main:app --reload
 cd backend && uv run pytest
+cd backend && uv run alembic upgrade head
 
 # Frontend
 cd frontend && npm run dev
 cd frontend && npm run lint
 ```
+
+### Antes de codear
+1. Si la tarea toca un área documentada en `agent_docs/`, leé el doc primero.
+2. Si la tarea agrega un patrón nuevo, considerá actualizar el doc correspondiente.
+3. No inventes nombres de tablas, endpoints o tools — confirmá contra el código existente.
 
 ## Qué NO hacer
 - No bypassear servicios desde los endpoints (rompe la arquitectura por capas).
