@@ -60,8 +60,6 @@ Definir la arquitectura del sistema y como interactuan sus diferentes componente
 | RNF-12 | Precisión | Las respuestas del chatbot deben generarse exclusivamente a partir de información recuperada de las fuentes indexadas. El system prompt debe instruir al modelo a no inventar información y a citar sus fuentes. |
 | RNF-13 | Calidad | Los embeddings deben generarse con un modelo que soporte contenido en español. Se debe evaluar la calidad de recuperación con un set de test de consultas reales en español argentino antes de elegir el modelo definitivo. |
 
-Solo unifiqué el formato de los IDs (todos con guión), corregí RN13 → RNF-13, y puse todo en tablas con la columna de categoría. Cero cambios de contenido.
-
 ****
 
 
@@ -82,7 +80,9 @@ Solo unifiqué el formato de los IDs (todos con guión), corregí RN13 → RNF-1
 
 ### Capa de Datos
 
-Definir que base de datos, ORM y tecnologías se utilizaron y por qué.
+PostgreSQL como base de datos relacional. Se eligió por ser de código abierto, robusta, escalable y con gran soporte comunitario. A diferencia de SQLite (limitada en concurrencia) o MySQL, Postgres ofrece soporte nativo para columnas JSONB (útil para almacenar metadata flexible de conversaciones y chunks) y full-text search en español. Además, la extensión pgvector permite almacenar y consultar embeddings vectoriales directamente en la misma base de datos, eliminando la necesidad de una base vectorial separada como ChromaDB o Pinecone. Esto simplifica la infraestructura al mantener datos relacionales y vectoriales en un único motor.
+
+SQLAlchemy como ORM. Permite interactuar con la base de datos mediante objetos Python en lugar de consultas SQL directas, facilitando el mantenimiento y la legibilidad del código. Es agnóstico del motor de base de datos, lo que permite cambiar de Postgres a SQLite o MySQL con cambios mínimos de configuración. Se complementa con Alembic para el manejo de migraciones de esquema.
 
 ### Capa de Negocio
 
