@@ -1,10 +1,17 @@
+name: utnhub
+
 services:
-  app:
+  backend:
     build: ./backend
+    container_name: utnhub-backend
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - venv:/app/.venv   
     env_file:
       - ./backend/.env
     command: uv run uvicorn app.main:app --reload --host 0.0.0.0
+
+volumes:
+  venv:
