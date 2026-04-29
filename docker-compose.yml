@@ -1,0 +1,10 @@
+services:
+  app:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    command: uv run uvicorn app.main:app --reload --host 0.0.0.0

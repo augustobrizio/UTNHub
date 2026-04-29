@@ -87,17 +87,32 @@ Cuatro reglas son centrales y deben tener tests en pytest:
 - Tipado con type hints en todo el backend.
 - Componentes React en TypeScript (`.tsx`), nombres en inglés.
 
-### Comandos útiles
-TODO: completar cuando esté configurado pyproject.toml y package.json.
+### Entorno de desarrollo
 
+El backend corre en Docker. La DB está en Neon (remota), no hay container de Postgres.
+
+**Setup inicial (una sola vez):**
 ```bash
-# Backend
-cd backend && uv run uvicorn app.main:app --reload
-cd backend && uv run pytest
-cd backend && uv run alembic upgrade head
+cp backend/.env.example backend/.env
+# Completar DATABASE_URL en backend/.env con el string de Neon
+```
 
-# Frontend
-cd frontend && npm run dev
+**Comandos del día a día:**
+```bash
+docker compose up           # levanta el backend en http://localhost:8000
+docker compose up --build   # rebuild de la imagen (cuando cambia pyproject.toml)
+docker compose down         # baja el container
+docker compose logs -f      # ver logs en tiempo real
+
+# Correr comandos dentro del container
+docker compose exec app uv run pytest
+docker compose exec app uv run alembic upgrade head
+docker compose exec app uv run alembic revision --autogenerate -m "descripcion"
+```
+
+**Frontend (directo en la máquina host):**
+```bash
+cd frontend && npm run dev     # http://localhost:3000
 cd frontend && npm run lint
 ```
 
