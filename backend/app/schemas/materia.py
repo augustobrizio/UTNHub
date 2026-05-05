@@ -1,6 +1,6 @@
-"""Schemas Pydantic para el dominio académico.
+"""Schemas Pydantic para el dominio academico.
 
-Estos DTOs son la frontera entre la capa de presentación (FastAPI) y la
+Estos DTOs son la frontera entre la capa de presentacion (FastAPI) y la
 de negocio (services). Nunca exponemos modelos SQLAlchemy directamente.
 """
 from __future__ import annotations
@@ -17,10 +17,10 @@ EstadoMateriaLiteral = Literal["aprobado", "regular", "cursando", "cursable", "l
 
 
 # ---------------------------------------------------------------------------
-# Recursos básicos
+# Recursos basicos
 # ---------------------------------------------------------------------------
 class MateriaOut(BaseModel):
-    """Vista pública de una materia."""
+    """Vista publica de una materia."""
 
     codigo: str
     nombre: str
@@ -44,7 +44,7 @@ class CorrelativaOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Grafo (lo que consume el frontend para pintar el árbol)
+# Grafo (lo que consume el frontend para pintar el arbol)
 # ---------------------------------------------------------------------------
 class MateriaNodo(BaseModel):
     """Nodo del grafo: una materia con su estado para el usuario."""
@@ -59,7 +59,7 @@ class MateriaNodo(BaseModel):
         ...,
         description=(
             "Estado calculado para el usuario: aprobado, regular, cursando, "
-            "cursable (cumple correlativas para anotarse) o libre (todavía no)."
+            "cursable (cumple correlativas para anotarse) o libre (todavia no)."
         ),
     )
     nota: float | None = None
@@ -86,7 +86,7 @@ class ContadoresGrafo(BaseModel):
 
 
 class GrafoResponse(BaseModel):
-    """Respuesta del endpoint del grafo (una pestaña: troncales o electivas)."""
+    """Respuesta del endpoint del grafo (una pestana: troncales o electivas)."""
 
     tipo: TipoMateriaLiteral
     nodos: list[MateriaNodo]
@@ -95,18 +95,18 @@ class GrafoResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Inscripción / validación
+# Inscripcion / validacion
 # ---------------------------------------------------------------------------
 class FaltanteCorrelativa(BaseModel):
-    """Una correlativa que el usuario aún no cumple."""
+    """Una correlativa que el usuario aun no cumple."""
 
     materia_requerida: str
     nombre: str
     requiere: TipoCorrelativaLiteral = Field(
-        ..., description="Condición mínima requerida"
+        ..., description="Condicion minima requerida"
     )
     tiene: CondicionMateria = Field(
-        ..., description="Condición actual del usuario sobre esa correlativa"
+        ..., description="Condicion actual del usuario sobre esa correlativa"
     )
 
 
@@ -118,3 +118,40 @@ class ValidacionCorrelativas(BaseModel):
     permitido: bool
     faltantes: list[FaltanteCorrelativa] = Field(default_factory=list)
     motivo: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Estado de cursada de un usuario
+# ---------------------------------------------------------------------------
+class UsuarioMateriaIn(BaseModel):
+    """Payload para registrar/actualizar el estado de una materia."""
+
+    condicion: CondicionMateria
+    nota: float | None = Field(
+        None,
+        ge=0,
+        le=10,
+        description="Nota numerica (0-10). Solo aplica si condicion='aprobado'.",
+    )
+    anio_cursada: int | None = Field(
+        None, ge=1900, description="Anio en que se curso la materia."
+    )
+    forzar: bool = Field(
+        False,
+        description=(
+            "Si es True, salta la validacion de correlativas. Util para "
+            "cargar historial pasado o casos especiales."
+        ),
+    )
+
+
+class UsuarioMateriaOut(BaseModel):
+    """Estado de cursada de una materia para un usuario."""
+
+    materia_codigo: str
+    nombre: str | None = None
+    condicion: CondicionMateria
+    nota: float | None = None
+    anio_cursada: int | None = None
+
+    model_config = ConfigDict(from_attributes=True)

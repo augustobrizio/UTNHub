@@ -10,6 +10,8 @@ from app.schemas.materia import (  # noqa: F401
     MateriaOut,
     TipoCorrelativaLiteral,
     TipoMateriaLiteral,
+    UsuarioMateriaIn,
+    UsuarioMateriaOut,
     ValidacionCorrelativas,
 )
 
@@ -24,5 +26,7 @@ __all__ = [
     "MateriaOut",
     "TipoCorrelativaLiteral",
     "TipoMateriaLiteral",
+    "UsuarioMateriaIn",
+    "UsuarioMateriaOut",
     "ValidacionCorrelativas",
 ]

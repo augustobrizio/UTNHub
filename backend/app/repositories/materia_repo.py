@@ -147,3 +147,56 @@ def usuario_materia(
         )
     )
     return db.execute(stmt).scalar_one_or_none()
+
+
+def list_usuario_materias(
+    db: Session, usuario_id: int
+) -> Sequence[UsuarioMateria]:
+    """Todas las cursadas registradas para un usuario."""
+    stmt = (
+        select(UsuarioMateria)
+        .where(UsuarioMateria.usuario_id == usuario_id)
+        .options(selectinload(UsuarioMateria.materia))
+        .order_by(UsuarioMateria.materia_codigo)
+    )
+    return db.execute(stmt).scalars().all()
+
+
+def upsert_usuario_materia(
+    db: Session,
+    *,
+    usuario_id: int,
+    materia_codigo: str,
+    condicion: CondicionMateria,
+    nota: float | None,
+    anio_cursada: int | None,
+) -> UsuarioMateria:
+    """Crea o actualiza el estado de una materia para un usuario."""
+    fila = usuario_materia(db, usuario_id, materia_codigo)
+    if fila is None:
+        fila = UsuarioMateria(
+            usuario_id=usuario_id,
+            materia_codigo=materia_codigo,
+            condicion=condicion,
+            nota=nota,
+            anio_cursada=anio_cursada,
+        )
+        db.add(fila)
+    else:
+        fila.condicion = condicion
+        fila.nota = nota
+        fila.anio_cursada = anio_cursada
+    db.flush()
+    return fila
+
+
+def delete_usuario_materia(
+    db: Session, usuario_id: int, materia_codigo: str
+) -> bool:
+    """Borra la fila de cursada. Devuelve True si había algo para borrar."""
+    fila = usuario_materia(db, usuario_id, materia_codigo)
+    if fila is None:
+        return False
+    db.delete(fila)
+    db.flush()
+    return True
