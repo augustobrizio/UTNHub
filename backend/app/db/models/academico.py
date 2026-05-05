@@ -15,7 +15,7 @@ import enum
 from datetime import time
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Float, ForeignKey, Integer, Text, Time
+from sqlalchemy import Float, ForeignKey, Integer, Text, Time, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -151,7 +151,13 @@ class UsuarioMateria(Base):
         Text, ForeignKey("materia.codigo"), nullable=False, index=True
     )
     condicion: Mapped[CondicionMateria] = mapped_column(
-        condicion_enum, default=CondicionMateria.NONE, nullable=False
+        condicion_enum,
+        default=CondicionMateria.NONE,
+        # ``server_default`` refleja el ``DEFAULT 'none'`` que ya existe en
+        # la DB. Lo declaramos para que Alembic vea que el modelo y la DB
+        # están sincronizados.
+        server_default=text("'none'"),
+        nullable=False,
     )
     nota: Mapped[float | None] = mapped_column(Float, nullable=True)
     anio_cursada: Mapped[int | None] = mapped_column(Integer, nullable=True)
