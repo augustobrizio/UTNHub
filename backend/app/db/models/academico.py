@@ -1,8 +1,7 @@
-"""Modelos del dominio académico: Materia, Correlatividad, UsuarioMateria.
+"""Modelos del dominio académico.
 
-Refleja el schema ya creado en Neon (tablas `materia`, `correlatividad`,
-`usuario_materia` y el ENUM `condicion_enum`). Los nombres de tablas y
-columnas coinciden 1:1 con el SQL existente — no agregamos columnas.
+Tablas: ``materia``, ``correlatividad``, ``usuario_materia``, ``comision``,
+``horario``. Refleja 1:1 el schema ya creado en Neon. No agregamos columnas.
 
 Convenciones:
 - Tipo de materia: ``"troncal"`` o ``"electiva"`` (string libre en DB).
@@ -13,16 +12,13 @@ Convenciones:
 from __future__ import annotations
 
 import enum
-from typing import TYPE_CHECKING
+from datetime import time
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Float, ForeignKey, Integer, Text
+from sqlalchemy import Float, ForeignKey, Integer, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-
-if TYPE_CHECKING:
-    from app.db.models.usuario import Usuario
 
 
 # ---------------------------------------------------------------------------
@@ -167,3 +163,45 @@ class UsuarioMateria(Base):
             f"<UsuarioMateria usuario={self.usuario_id} "
             f"materia={self.materia_codigo} condicion={self.condicion.value}>"
         )
+
+
+class Comision(Base):
+    """Una comisión concreta de cursado de una materia (ej: K3051 año 2025)."""
+
+    __tablename__ = "comision"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    materia_codigo: Mapped[str] = mapped_column(
+        Text, ForeignKey("materia.codigo"), nullable=False, index=True
+    )
+    nombre: Mapped[str | None] = mapped_column(Text, nullable=True)
+    anio: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cuatrimestre: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    materia: Mapped[Materia] = relationship()
+    horarios: Mapped[list["Horario"]] = relationship(
+        back_populates="comision", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Comision id={self.id} materia={self.materia_codigo} {self.nombre}>"
+
+
+class Horario(Base):
+    """Bloque de horario de una comisión (un día y franja)."""
+
+    __tablename__ = "horario"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    comision_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("comision.id"), nullable=False, index=True
+    )
+    dia: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hora_inicio: Mapped[time | None] = mapped_column(Time, nullable=True)
+    hora_fin: Mapped[time | None] = mapped_column(Time, nullable=True)
+    aula: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    comision: Mapped[Comision] = relationship(back_populates="horarios")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Horario {self.dia} {self.hora_inicio}-{self.hora_fin} aula={self.aula}>"
