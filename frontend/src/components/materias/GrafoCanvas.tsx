@@ -13,7 +13,7 @@ interface Props {
   onToggleEstado: (codigo: string, estadoActual: EstadoMateria) => void;
 }
 
-const ORDINAL: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3ro", 4: "4to", 5: "5to" };
+const ORDINAL: Record<number, string> = { 0: "Sin Año", 1: "1ro", 2: "2do", 3: "3ro", 4: "4to", 5: "5to" };
 
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 2;
@@ -89,7 +89,7 @@ export function GrafoCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[760px] bg-surface-container-low rounded-3xl overflow-hidden bg-blueprint group select-none"
+      className="relative w-full h-[840px] bg-surface-container-low rounded-3xl overflow-hidden bg-blueprint group select-none"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -126,7 +126,7 @@ export function GrafoCanvas({
             className="fill-outline font-headline font-bold uppercase tracking-widest"
             fontSize="11"
           >
-            {ORDINAL[col.anio] ?? `${col.anio}o`} Año
+            {ORDINAL[col.anio] ?? `${col.anio}ro`} {col.anio !== 0 ? "Año" : ""}
           </text>
         ))}
 

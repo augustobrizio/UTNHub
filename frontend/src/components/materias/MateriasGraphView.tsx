@@ -305,14 +305,16 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
         <LeyendaEstados />
       </div>
 
-      <GrafoCanvas
-        nodos={nodosEfectivos}
-        edges={grafo.edges}
-        atenuados={atenuados}
-        seleccionado={seleccionado}
-        onSelect={setSeleccionado}
-        onToggleEstado={handleToggleEstado}
-      />
+      <div className="mt-4">
+        <GrafoCanvas
+          nodos={nodosEfectivos}
+          edges={grafo.edges}
+          atenuados={atenuados}
+          seleccionado={seleccionado}
+          onSelect={setSeleccionado}
+          onToggleEstado={handleToggleEstado}
+        />
+      </div>
 
       {nodoSeleccionado && (
         <div className="mt-6">
