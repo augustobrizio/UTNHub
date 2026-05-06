@@ -114,11 +114,18 @@ def construir_grafo(
         porcentaje_aprobadas=porcentaje,
     )
 
+    registros_usuario = {
+        codigo: condicion.value
+        for codigo, condicion in condiciones.items()
+        if condicion != CondicionMateria.NONE
+    }
+
     return GrafoResponse(
         tipo=tipo,
         nodos=nodos,
         edges=edges,
         contadores=contadores_grafo,
+        registros_usuario=registros_usuario,
     )
 
 

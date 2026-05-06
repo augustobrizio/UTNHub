@@ -15,7 +15,7 @@ import enum
 from datetime import time
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Float, ForeignKey, Integer, Text, Time, text
+from sqlalchemy import Float, ForeignKey, Integer, Text, Time, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -142,6 +142,7 @@ class UsuarioMateria(Base):
     """
 
     __tablename__ = "usuario_materia"
+    __table_args__ = (UniqueConstraint("usuario_id", "materia_codigo", name="uq_usuario_materia"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     usuario_id: Mapped[int] = mapped_column(

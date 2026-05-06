@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =====================================================================
+ * Kinetic Blueprint — base styles
+ * ===================================================================*/
+
+@layer base {
+  html {
+    @apply bg-surface text-on-surface;
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-surface;
+  }
+
+  /* "No-Line Rule": evitamos los borders 1px solid grey por defecto. */
+  hr {
+    @apply border-0 h-px bg-outline-variant/30;
+  }
+
+  /* selection accent */
+  ::selection {
+    background-color: rgba(173, 198, 255, 0.3);
+  }
+}
+
+/* =====================================================================
+ * Kinetic Blueprint — components
+ * ===================================================================*/
+
+@layer components {
+  /* Patron de fondo "blueprint": dotted radial sobre bg surface. */
+  .bg-blueprint {
+    background-image: radial-gradient(
+      circle at 2px 2px,
+      rgba(67, 71, 80, 0.18) 1px,
+      transparent 0
+    );
+    background-size: 40px 40px;
+  }
+
+  /* Glow states para los nodos del grafo. Border 1px + box-shadow blur. */
+  .node-glow-approved {
+    box-shadow: 0 0 16px rgba(125, 255, 162, 0.22);
+    border: 1px solid #7dffa2;
+  }
+
+  .node-glow-regular {
+    box-shadow: 0 0 16px rgba(255, 185, 80, 0.18);
+    border: 1px solid #ffb950;
+  }
+
+  .node-glow-cursable {
+    box-shadow: 0 0 16px rgba(173, 198, 255, 0.22);
+    border: 1px solid #adc6ff;
+  }
+
+  .node-glow-cursando {
+    box-shadow: 0 0 16px rgba(173, 198, 255, 0.18);
+    border: 1px dashed #adc6ff;
+  }
+
+  .node-locked {
+    border: 1px solid rgba(67, 71, 80, 0.45);
+  }
+
+  /* Material Symbols — copia el setup del Stitch. */
+  .material-symbols-outlined {
+    font-family: "Material Symbols Outlined";
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+
+  .material-symbols-filled {
+    font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+
+  /* Glass overlay — para topbar y popovers flotantes. */
+  .glass {
+    background-color: rgba(49, 57, 77, 0.6);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+}

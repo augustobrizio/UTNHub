@@ -92,6 +92,13 @@ class GrafoResponse(BaseModel):
     nodos: list[MateriaNodo]
     edges: list[CorrelativaEdge]
     contadores: ContadoresGrafo
+    registros_usuario: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Mapa codigo->condicion de TODAS las materias del usuario "
+            "(troncales + electivas). Permite al frontend calcular cascadas cross-tab."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
