@@ -145,14 +145,18 @@ def notas_usuario(db: Session, usuario_id: int) -> dict[str, float | None]:
 def usuario_materia(
     db: Session, usuario_id: int, materia_codigo: str
 ) -> UsuarioMateria | None:
-    """Una sola fila de cursada."""
-    stmt = select(UsuarioMateria).where(
-        and_(
-            UsuarioMateria.usuario_id == usuario_id,
-            UsuarioMateria.materia_codigo == materia_codigo,
+    """Una sola fila de cursada. Usa first() para tolerar duplicados en DB."""
+    stmt = (
+        select(UsuarioMateria)
+        .where(
+            and_(
+                UsuarioMateria.usuario_id == usuario_id,
+                UsuarioMateria.materia_codigo == materia_codigo,
+            )
         )
+        .order_by(UsuarioMateria.id.desc())
     )
-    return db.execute(stmt).scalar_one_or_none()
+    return db.execute(stmt).scalars().first()
 
 
 def list_usuario_materias(
@@ -177,9 +181,24 @@ def upsert_usuario_materia(
     nota: float | None,
     anio_cursada: int | None,
 ) -> UsuarioMateria:
-    """Crea o actualiza el estado de una materia para un usuario."""
-    fila = usuario_materia(db, usuario_id, materia_codigo)
-    if fila is None:
+    """Crea o actualiza el estado de una materia para un usuario.
+
+    Defensivo ante duplicados en DB: si existen múltiples filas (puede ocurrir
+    si la UniqueConstraint no estaba activa), conserva la de mayor id y borra
+    las restantes para dejar el estado consistente.
+    """
+    filas = db.execute(
+        select(UsuarioMateria)
+        .where(
+            and_(
+                UsuarioMateria.usuario_id == usuario_id,
+                UsuarioMateria.materia_codigo == materia_codigo,
+            )
+        )
+        .order_by(UsuarioMateria.id.desc())
+    ).scalars().all()
+
+    if not filas:
         fila = UsuarioMateria(
             usuario_id=usuario_id,
             materia_codigo=materia_codigo,
@@ -189,9 +208,13 @@ def upsert_usuario_materia(
         )
         db.add(fila)
     else:
+        fila = filas[0]  # la de mayor id es la más reciente
+        for dup in filas[1:]:
+            db.delete(dup)  # limpiar duplicados al vuelo
         fila.condicion = condicion
         fila.nota = nota
         fila.anio_cursada = anio_cursada
+
     db.flush()
     return fila
 

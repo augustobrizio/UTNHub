@@ -471,27 +471,23 @@ function MateriaModal({
                     if (!m) return null;
                     const esAprobada = edge.tipo === "aprobada";
                     const cuatriM = m.cuatrimestre != null
-                      ? `${CUATRI_ORD[m.cuatrimestre] ?? m.cuatrimestre}° cuatri`
+                      ? `${CUATRI_ORD[m.cuatrimestre] ?? m.cuatrimestre}° cuatrimestre`
                       : "Anual";
                     return (
                       <li
                         key={`req-${edge.desde}-${edge.tipo}`}
                         className="rounded-xl bg-surface-container-high border border-outline-variant/10 overflow-hidden"
                       >
-                        <div className="px-3 py-2.5 flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-on-surface font-medium leading-snug">{m.nombre}</p>
-                            <p className="text-[9px] text-outline/60 mt-0.5">{m.codigo} · {cuatriM}</p>
-                          </div>
-                          <EstadoBadge estado={m.estado} compact />
+                        <div className="px-3 py-2.5">
+                          <p className="text-xs text-on-surface font-medium leading-snug">{m.nombre}</p>
+                          <p className="text-[9px] text-outline/50 mt-0.5">{m.codigo} · {cuatriM}</p>
                         </div>
-                        {/* Banda de requisito */}
-                        <div className={`px-3 py-1.5 flex items-center gap-1.5 ${esAprobada ? "bg-tertiary/8 border-t border-tertiary/15" : "bg-primary/8 border-t border-primary/15"}`}>
+                        <div className={`px-3 py-1.5 flex items-center gap-1.5 ${esAprobada ? "bg-tertiary/10 border-t border-tertiary/20" : "bg-primary/10 border-t border-primary/20"}`}>
                           <span className={`material-symbols-outlined text-[13px] ${esAprobada ? "text-tertiary" : "text-primary"}`}>
                             {esAprobada ? "school" : "edit_note"}
                           </span>
                           <span className={`text-[9px] font-bold uppercase tracking-widest font-label ${esAprobada ? "text-tertiary" : "text-primary"}`}>
-                            {esAprobada ? "Aprobar final" : "Regularizar (aprobar parciales)"}
+                            {esAprobada ? "Necesitás aprobada (final rendido)" : "Necesitás regularizada (parciales aprobados)"}
                           </span>
                         </div>
                       </li>
@@ -515,23 +511,20 @@ function MateriaModal({
                     if (!m) return null;
                     const esAprobada = edge.tipo === "aprobada";
                     const cuatriM = m.cuatrimestre != null
-                      ? `${CUATRI_ORD[m.cuatrimestre] ?? m.cuatrimestre}° cuatri`
+                      ? `${CUATRI_ORD[m.cuatrimestre] ?? m.cuatrimestre}° cuatrimestre`
                       : "Anual";
                     return (
                       <li
                         key={`hab-${edge.hacia}-${edge.tipo}`}
                         className="rounded-xl bg-surface-container-high border border-outline-variant/10 overflow-hidden"
                       >
-                        <div className="px-3 py-2.5 flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-on-surface font-medium leading-snug truncate">{m.nombre}</p>
-                            <p className="text-[9px] text-outline/60 mt-0.5">{m.codigo} · {cuatriM}</p>
-                          </div>
-                          <EstadoBadge estado={m.estado} compact />
+                        <div className="px-3 py-2.5">
+                          <p className="text-xs text-on-surface font-medium leading-snug">{m.nombre}</p>
+                          <p className="text-[9px] text-outline/50 mt-0.5">{m.codigo} · {cuatriM}</p>
                         </div>
-                        <div className={`px-3 py-1 flex items-center gap-1.5 ${esAprobada ? "bg-tertiary/8 border-t border-tertiary/15" : "bg-primary/8 border-t border-primary/15"}`}>
+                        <div className={`px-3 py-1 flex items-center gap-1.5 ${esAprobada ? "bg-tertiary/10 border-t border-tertiary/20" : "bg-primary/10 border-t border-primary/20"}`}>
                           <span className={`text-[9px] font-bold uppercase tracking-widest font-label ${esAprobada ? "text-tertiary" : "text-primary"}`}>
-                            {esAprobada ? "Requiere aprobar final" : "Requiere regularizar"}
+                            {esAprobada ? "Con final aprobado" : "Con regularizada"}
                           </span>
                         </div>
                       </li>
