@@ -44,5 +44,7 @@ export default async function MateriasPage({ searchParams }: PageProps) {
     return <GrafoErrorState mensaje={errorMsg ?? "No se pudo cargar el grafo."} />;
   }
 
-  return <MateriasGraphView grafo={grafo} tipo={tipo} />;
+  // key={tipo} fuerza remount limpio al cambiar de pestaña, evitando
+  // desfases de estado entre el grafo nuevo y los registros locales.
+  return <MateriasGraphView key={tipo} grafo={grafo} tipo={tipo} />;
 }

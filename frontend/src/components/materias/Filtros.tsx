@@ -2,13 +2,18 @@
 
 import type { EstadoMateria } from "@/lib/types";
 
+const ANIO_ORDINAL: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
+
 const ESTADOS: ReadonlyArray<{ value: EstadoMateria; label: string }> = [
-  { value: "aprobado", label: "Aprobada" },
-  { value: "regular", label: "Regular" },
-  { value: "cursando", label: "Cursando" },
-  { value: "cursable", label: "Cursable" },
-  { value: "libre", label: "Bloqueada" },
+  { value: "aprobado",  label: "Aprobadas"  },
+  { value: "regular",   label: "Regulares"  },
+  { value: "cursando",  label: "Cursando"   },
+  { value: "cursable",  label: "Cursables"  },
+  { value: "libre",     label: "Bloqueadas" },
 ];
+
+const SELECT_CLS =
+  "bg-surface-container-high border border-outline-variant/15 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/40 text-on-surface cursor-pointer hover:border-outline-variant/30 transition-colors";
 
 interface Props {
   anios: number[];
@@ -18,53 +23,37 @@ interface Props {
   onEstadoChange: (v: EstadoMateria | "todos") => void;
 }
 
-export function Filtros({
-  anios,
-  anioFiltro,
-  estadoFiltro,
-  onAnioChange,
-  onEstadoChange,
-}: Props) {
+export function Filtros({ anios, anioFiltro, estadoFiltro, onAnioChange, onEstadoChange }: Props) {
   return (
-    <div className="flex flex-wrap gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[10px] uppercase tracking-widest font-bold text-outline font-label">
-          Anio de cursada
-        </label>
-        <select
-          value={anioFiltro}
-          onChange={(e) => {
-            const v = e.target.value;
-            onAnioChange(v === "todos" ? "todos" : Number(v));
-          }}
-          className="bg-surface-container-highest border-none text-sm rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-on-surface min-w-[160px] cursor-pointer"
-        >
-          <option value="todos">Todos los anios</option>
-          {anios.map((a) => (
-            <option key={a} value={a}>
-              {a}o Anio
-            </option>
-          ))}
-        </select>
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <select
+        value={anioFiltro}
+        onChange={(e) => {
+          const v = e.target.value;
+          onAnioChange(v === "todos" ? "todos" : Number(v));
+        }}
+        className={SELECT_CLS}
+      >
+        <option value="todos">Todos los años</option>
+        {anios.map((a) => (
+          <option key={a} value={a}>
+            {ANIO_ORDINAL[a] ?? `${a}°`} Año
+          </option>
+        ))}
+      </select>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[10px] uppercase tracking-widest font-bold text-outline font-label">
-          Estado
-        </label>
-        <select
-          value={estadoFiltro}
-          onChange={(e) => onEstadoChange(e.target.value as EstadoMateria | "todos")}
-          className="bg-surface-container-highest border-none text-sm rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-on-surface min-w-[160px] cursor-pointer"
-        >
-          <option value="todos">Cualquier estado</option>
-          {ESTADOS.map((e) => (
-            <option key={e.value} value={e.value}>
-              {e.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <select
+        value={estadoFiltro}
+        onChange={(e) => onEstadoChange(e.target.value as EstadoMateria | "todos")}
+        className={SELECT_CLS}
+      >
+        <option value="todos">Cualquier estado</option>
+        {ESTADOS.map((e) => (
+          <option key={e.value} value={e.value}>
+            {e.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

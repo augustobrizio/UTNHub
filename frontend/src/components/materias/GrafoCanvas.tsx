@@ -11,9 +11,10 @@ interface Props {
   seleccionado: string | null;
   onSelect: (codigo: string | null) => void;
   onToggleEstado: (codigo: string, estadoActual: EstadoMateria) => void;
+  onLongPress: (codigo: string) => void;
 }
 
-const ORDINAL: Record<number, string> = { 0: "Sin Año", 1: "1ro", 2: "2do", 3: "3ro", 4: "4to", 5: "5to" };
+const ORDINAL: Record<number, string> = { 0: "Sin Año", 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
 
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 2;
@@ -26,6 +27,7 @@ export function GrafoCanvas({
   seleccionado,
   onSelect,
   onToggleEstado,
+  onLongPress,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fitZoomRef = useRef(0.7);
@@ -89,7 +91,7 @@ export function GrafoCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[840px] bg-surface-container-low rounded-3xl overflow-hidden bg-blueprint group select-none"
+      className="relative w-full h-[840px] bg-surface-container-lowest rounded-3xl overflow-hidden bg-blueprint group select-none border border-outline-variant/10 shadow-[inset_0_0_60px_rgba(11,19,38,0.6)]"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -121,10 +123,13 @@ export function GrafoCanvas({
           <text
             key={`col-${col.anio}`}
             x={col.x + NODE_W / 2}
-            y={28}
+            y={62}
             textAnchor="middle"
-            className="fill-outline font-headline font-bold uppercase tracking-widest"
-            fontSize="11"
+            fill="var(--color-on-surface-variant, #a0a8b4)"
+            fontSize="12"
+            fontWeight="800"
+            fontFamily="inherit"
+            letterSpacing="0.08em"
           >
             {ORDINAL[col.anio] ?? `${col.anio}ro`} {col.anio !== 0 ? "Año" : ""}
           </text>
@@ -191,6 +196,7 @@ export function GrafoCanvas({
                   onSelect(nodo.codigo);
                   onToggleEstado(nodo.codigo, nodo.estado);
                 }}
+                onLongPress={() => onLongPress(nodo.codigo)}
               />
             </foreignObject>
           );
@@ -198,14 +204,15 @@ export function GrafoCanvas({
       </svg>
 
       {/* Hint de interaccion */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[10px] text-outline/60 font-label tracking-widest uppercase pointer-events-none select-none">
-        Toca un nodo para cambiar su estado · Arrastra para mover
+      <div className="absolute top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-surface-container-lowest/70 backdrop-blur-md border border-outline-variant/10 text-[9px] text-outline/50 font-label tracking-widest uppercase pointer-events-none select-none whitespace-nowrap">
+        Toca para cambiar estado · Mantené presionado para más detalle · Arrastrá para mover
       </div>
 
       {/* Controles flotantes de zoom */}
-      <div className="absolute bottom-6 right-6 flex flex-col gap-2 bg-surface-container-highest/80 backdrop-blur-md p-2 rounded-xl border border-outline-variant/20 z-10">
+      <div className="absolute bottom-5 right-5 flex flex-col gap-1 bg-surface-container-lowest/90 backdrop-blur-md p-1.5 rounded-xl border border-outline-variant/15 z-10 shadow-lg">
         <ZoomBtn icon="add" onClick={handleZoomIn} aria-label="Zoom in" />
         <ZoomBtn icon="remove" onClick={handleZoomOut} aria-label="Zoom out" />
+        <div className="w-full h-px bg-outline-variant/20 my-0.5" />
         <ZoomBtn icon="fit_screen" onClick={handleReset} aria-label="Fit view" />
       </div>
     </div>
@@ -263,14 +270,14 @@ const ESTADO_STYLES: Record<
     iconColor: "text-primary",
     icon: "bolt",
     tagColor: "text-primary",
-    progress: "bg-primary w-1/4",
+    progress: "w-0",
   },
   libre: {
     glow: "node-locked",
     iconColor: "text-outline",
     icon: "lock",
     tagColor: "text-outline",
-    progress: "bg-outline w-0",
+    progress: "w-0",
   },
 };
 
@@ -282,24 +289,59 @@ const TOGGLEABLES: ReadonlySet<EstadoMateria> = new Set([
   "aprobado",
 ]);
 
+const ANIO_ORD: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
+
 function NodoCard({
   nodo,
   selected,
   atenuado,
   onClick,
+  onLongPress,
 }: {
   nodo: MateriaNodo;
   selected: boolean;
   atenuado: boolean;
   onClick: () => void;
+  onLongPress: () => void;
 }) {
   const style = ESTADO_STYLES[nodo.estado];
   const toggleable = TOGGLEABLES.has(nodo.estado);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = useRef(false);
+
+  const startLongPress = () => {
+    didLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      onLongPress();
+    }, 800);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleClick = () => {
+    if (didLongPress.current) return; // ignorar click post-longpress
+    onClick();
+  };
+
+  const anioTag = nodo.anio_carrera != null
+    ? `${ANIO_ORD[nodo.anio_carrera] ?? nodo.anio_carrera} · ${nodo.codigo}`
+    : nodo.codigo;
 
   return (
     <div
       data-nodo={nodo.codigo}
-      onClick={onClick}
+      onClick={handleClick}
+      onMouseDown={startLongPress}
+      onMouseUp={cancelLongPress}
+      onMouseLeave={cancelLongPress}
+      onTouchStart={startLongPress}
+      onTouchEnd={cancelLongPress}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -308,7 +350,7 @@ function NodoCard({
       }}
       role="button"
       tabIndex={0}
-      title={toggleable ? "Click para cambiar estado" : undefined}
+      title={toggleable ? "Click para cambiar estado · Mantener para ver detalle" : "Mantener para ver detalle"}
       className={[
         "w-full h-full p-3 bg-surface-container-high rounded-xl",
         "transition-all duration-200",
@@ -320,7 +362,7 @@ function NodoCard({
     >
       <div className="flex justify-between items-start mb-1.5">
         <span className={`text-[9px] font-bold uppercase tracking-tighter font-label ${style.tagColor}`}>
-          {nodo.anio_carrera ? `${nodo.anio_carrera}o · ${nodo.codigo}` : nodo.codigo}
+          {anioTag}
         </span>
         <span
           className={`material-symbols-outlined text-[14px] ${style.iconColor} ${

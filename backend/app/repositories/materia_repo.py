@@ -27,6 +27,12 @@ def get_by_codigo(db: Session, codigo: str) -> Materia | None:
     return db.get(Materia, codigo)
 
 
+def get_by_codigos(db: Session, codigos: Iterable[str]) -> Sequence[Materia]:
+    """Devuelve las materias cuyos códigos están en la lista."""
+    stmt = select(Materia).where(Materia.codigo.in_(list(codigos)))
+    return db.execute(stmt).scalars().all()
+
+
 def list_materias(db: Session, *, tipo: str | None = None) -> Sequence[Materia]:
     """Lista materias, opcionalmente filtradas por tipo (``troncal`` / ``electiva``)."""
     stmt = select(Materia).order_by(

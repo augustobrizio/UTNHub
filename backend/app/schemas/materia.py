@@ -83,6 +83,9 @@ class ContadoresGrafo(BaseModel):
     libres: int
     total: int
     porcentaje_aprobadas: float
+    carga_horaria_cursando: int = 0
+    creditos_electivas: int = 0
+    meta_creditos_electivas: int = 20
 
 
 class GrafoResponse(BaseModel):
@@ -97,6 +100,14 @@ class GrafoResponse(BaseModel):
         description=(
             "Mapa codigo->condicion de TODAS las materias del usuario "
             "(troncales + electivas). Permite al frontend calcular cascadas cross-tab."
+        ),
+    )
+    nodos_externos: list[MateriaNodo] = Field(
+        default_factory=list,
+        description=(
+            "Nodos de otras pestanas referenciados como prereqs en los edges. "
+            "No se renderizan en el grafo pero permiten mostrar sus nombres y estados "
+            "en el panel de detalle."
         ),
     )
 

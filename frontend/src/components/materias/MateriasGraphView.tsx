@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   ContadoresGrafo,
@@ -15,7 +15,7 @@ import { GrafoCanvas } from "./GrafoCanvas";
 import { HeaderStats } from "./HeaderStats";
 import { Filtros } from "./Filtros";
 import { LeyendaEstados } from "./LeyendaEstados";
-import { MateriaDetallePanel } from "./MateriaDetallePanel";
+import { MateriaDetallePanel, EstadoBadge } from "./MateriaDetallePanel";
 
 const USUARIO_ID = 1;
 
@@ -79,7 +79,8 @@ function computarEstados(
           // usamos externalRegistros como fallback.
           const est = computed.get(edge.desde) ?? externalRegistros[edge.desde];
           if (edge.tipo === "aprobada") return est === "aprobado";
-          return est === "regular" || est === "cursando" || est === "aprobado";
+          // "cursando" no cuenta: regularizar requiere haber pasado los parciales.
+          return est === "regular" || est === "aprobado";
         });
         computed.set(nodo.codigo, ok ? "cursable" : "libre");
       }
@@ -89,8 +90,10 @@ function computarEstados(
   return nodos.map((n) => ({ ...n, estado: computed.get(n.codigo) ?? n.estado }));
 }
 
-/** Calcula los contadores KPI desde los nodos efectivos (en tiempo real). */
-function computarContadores(nodos: MateriaNodo[]): ContadoresGrafo {
+/** Calcula los contadores KPI desde los nodos efectivos (en tiempo real).
+ *  Los campos cross-tab (carga_horaria_cursando, creditos_electivas) se toman
+ *  del servidor ya que requieren datos de ambas pestanas. */
+function computarContadores(nodos: MateriaNodo[], serverContadores: ContadoresGrafo): ContadoresGrafo {
   const aprobadas = nodos.filter((n) => n.estado === "aprobado").length;
   const regulares = nodos.filter((n) => n.estado === "regular").length;
   const cursando = nodos.filter((n) => n.estado === "cursando").length;
@@ -104,16 +107,21 @@ function computarContadores(nodos: MateriaNodo[]): ContadoresGrafo {
     libres: total - aprobadas - regulares - cursando - cursables,
     total,
     porcentaje_aprobadas: total > 0 ? (aprobadas / total) * 100 : 0,
+    carga_horaria_cursando: serverContadores.carga_horaria_cursando,
+    creditos_electivas: serverContadores.creditos_electivas,
+    meta_creditos_electivas: serverContadores.meta_creditos_electivas,
   };
 }
 
 // Ciclo de estados al hacer click:
-//   cursable/cursando → "regular"
-//   regular           → "aprobado"
-//   aprobado          → null  (eliminar registro, vuelve a cursable)
-//   libre             → ""    (noop)
+//   cursable  → "cursando"
+//   cursando  → "regular"
+//   regular   → "aprobado"
+//   aprobado  → null  (eliminar registro, vuelve a cursable)
+//   libre     → ""    (noop)
 function siguienteCondicion(estado: EstadoMateria): EstadoMateria | null | "" {
-  if (estado === "cursable" || estado === "cursando") return "regular";
+  if (estado === "cursable") return "cursando";
+  if (estado === "cursando") return "regular";
   if (estado === "regular") return "aprobado";
   if (estado === "aprobado") return null;
   return "";
@@ -135,6 +143,7 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
   const [anioFiltro, setAnioFiltro] = useState<number | "todos">("todos");
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoMateria | "todos">("todos");
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  const [modalCodigo, setModalCodigo] = useState<string | null>(null);
 
   // Fuente de verdad local: registros explicitos del usuario.
   // Se inicializa con los datos del servidor y se actualiza con cada click.
@@ -142,26 +151,36 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
     () => buildRegistros(grafo.nodos),
   );
 
-  // Cuando el tipo cambia (tab troncal ↔ electiva) el servidor trae un
-  // grafo nuevo. Resincronizamos registros con los datos frescos.
-  const tipoAnterior = useRef(tipo);
-  useEffect(() => {
-    if (tipoAnterior.current !== tipo) {
-      tipoAnterior.current = tipo;
-      setRegistros(buildRegistros(grafo.nodos));
-      setSeleccionado(null);
-    }
-  }, [tipo, grafo.nodos]);
-
   // Debounce de API calls por materia para evitar race conditions
   // cuando el usuario hace click rapido sobre el mismo nodo.
   const pendingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const intendedState = useRef<Record<string, EstadoMateria | null>>({});
 
   const handleTipoChange = (nuevo: TipoMateria) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tipo", nuevo);
-    router.push(`?${params.toString()}`, { scroll: false });
+    // Flush debounces pendientes antes de cambiar de pestaña para que el
+    // servidor tenga los estados actualizados al traer el nuevo grafo.
+    const promises: Promise<unknown>[] = [];
+    for (const cod of Object.keys(pendingTimers.current)) {
+      clearTimeout(pendingTimers.current[cod]);
+      delete pendingTimers.current[cod];
+      const intended = intendedState.current[cod];
+      delete intendedState.current[cod];
+      if (intended === null) {
+        promises.push(eliminarEstado(USUARIO_ID, cod));
+      } else if (intended !== undefined) {
+        promises.push(registrarEstado(USUARIO_ID, cod, { condicion: intended, forzar: true }));
+      }
+    }
+    const navigate = () => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tipo", nuevo);
+      router.push(`?${params.toString()}`, { scroll: false });
+    };
+    if (promises.length > 0) {
+      void Promise.all(promises).finally(navigate);
+    } else {
+      navigate();
+    }
   };
 
   const handleToggleEstado = (codigo: string, estadoActual: EstadoMateria) => {
@@ -234,7 +253,10 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
   );
 
   // Contadores KPI calculados en tiempo real.
-  const contadores = useMemo(() => computarContadores(nodosEfectivos), [nodosEfectivos]);
+  const contadores = useMemo(
+    () => computarContadores(nodosEfectivos, grafo.contadores),
+    [nodosEfectivos, grafo.contadores],
+  );
 
   const aniosDisponibles = useMemo(() => {
     const anios = new Set<number>();
@@ -258,30 +280,43 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
     return set;
   }, [nodosEfectivos, anioFiltro, estadoFiltro]);
 
+  // Todos los nodos visibles + externos (para lookup en el panel de detalle)
+  const todosLosNodos = useMemo(
+    () => [...nodosEfectivos, ...grafo.nodos_externos],
+    [nodosEfectivos, grafo.nodos_externos],
+  );
+
   const nodoSeleccionado = useMemo(
-    () => nodosEfectivos.find((n) => n.codigo === seleccionado) ?? null,
-    [nodosEfectivos, seleccionado],
+    () => todosLosNodos.find((n) => n.codigo === seleccionado) ?? null,
+    [todosLosNodos, seleccionado],
+  );
+
+  const nodoModal = useMemo(
+    () => todosLosNodos.find((n) => n.codigo === modalCodigo) ?? null,
+    [todosLosNodos, modalCodigo],
   );
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-        <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-widest font-bold text-outline font-label">
+    <div className="p-6 md:p-8 max-w-[1600px] mx-auto">
+
+      {/* Header */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+        <div>
+          <p className="text-[9px] uppercase tracking-[0.15em] font-bold text-outline/60 font-label mb-2">
             ISI · Plan 2023
           </p>
-          <h1 className="text-4xl font-extrabold tracking-tight font-headline text-on-surface">
+          <h1 className="text-3xl font-extrabold tracking-tight font-headline text-on-surface mb-1">
             Grafo de Correlativas
           </h1>
-          <p className="text-on-surface-variant max-w-xl">
-            Mapa interactivo de Ingenieria en Sistemas de Informacion. Visualiza
-            tu progreso academico y planifica tus proximos pasos.
+          <p className="text-sm text-on-surface-variant">
+            Visualizá tu avance y planificá tus próximos pasos.
           </p>
         </div>
         <HeaderStats contadores={contadores} />
       </header>
 
-      <div className="flex items-center gap-2 mb-6">
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-4 p-1 bg-surface-container/50 rounded-2xl border border-outline-variant/10 w-fit">
         <TabToggle
           label="Troncales"
           activo={tipo === "troncal"}
@@ -294,7 +329,8 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
         />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-6 mb-6 p-6 bg-surface-container/40 backdrop-blur-md rounded-2xl border border-outline-variant/10">
+      {/* Filtros + leyenda */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 px-5 py-4 bg-surface-container/40 backdrop-blur-md rounded-2xl border border-outline-variant/10">
         <Filtros
           anios={aniosDisponibles}
           anioFiltro={anioFiltro}
@@ -305,7 +341,7 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
         <LeyendaEstados />
       </div>
 
-      <div className="mt-4">
+      <div>
         <GrafoCanvas
           nodos={nodosEfectivos}
           edges={grafo.edges}
@@ -313,6 +349,7 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
           seleccionado={seleccionado}
           onSelect={setSeleccionado}
           onToggleEstado={handleToggleEstado}
+          onLongPress={(codigo) => setModalCodigo(codigo)}
         />
       </div>
 
@@ -321,11 +358,191 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
           <MateriaDetallePanel
             nodo={nodoSeleccionado}
             edges={grafo.edges}
-            todosLosNodos={nodosEfectivos}
+            todosLosNodos={todosLosNodos}
             onClose={() => setSeleccionado(null)}
           />
         </div>
       )}
+
+      {nodoModal && (
+        <MateriaModal
+          nodo={nodoModal}
+          edges={grafo.edges}
+          todosLosNodos={todosLosNodos}
+          onClose={() => setModalCodigo(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Modal de detalle (apertura por long-press)
+// ---------------------------------------------------------------------------
+
+const ANIO_ORD: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
+const CUATRI_ORD: Record<number, string> = { 1: "1er", 2: "2do" };
+
+function MateriaModal({
+  nodo,
+  edges,
+  todosLosNodos,
+  onClose,
+}: {
+  nodo: MateriaNodo;
+  edges: CorrelativaEdge[];
+  todosLosNodos: MateriaNodo[];
+  onClose: () => void;
+}) {
+  const requeridas = edges.filter((e) => e.hacia === nodo.codigo);
+  const habilita = edges.filter((e) => e.desde === nodo.codigo);
+  const lookup = new Map(todosLosNodos.map((n) => [n.codigo, n] as const));
+
+  const anioLabel = nodo.anio_carrera != null
+    ? `${ANIO_ORD[nodo.anio_carrera] ?? `${nodo.anio_carrera}°`} Año`
+    : null;
+  const cuatriLabel = nodo.cuatrimestre != null
+    ? `${CUATRI_ORD[nodo.cuatrimestre] ?? `${nodo.cuatrimestre}°`} Cuatrimestre`
+    : "Anual";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        className="relative z-10 w-full max-w-xl bg-surface-container border border-outline-variant/20 rounded-3xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header con gradiente */}
+        <div className="px-7 pt-7 pb-5 border-b border-outline-variant/10 shrink-0 bg-surface-container-high rounded-t-3xl">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 rounded-lg hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors"
+            aria-label="Cerrar"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+
+          <div className="flex items-start gap-3 mb-3">
+            <EstadoBadge estado={nodo.estado} />
+            <div className="flex flex-wrap gap-1.5">
+              {anioLabel && (
+                <span className="text-[9px] bg-surface-container px-2 py-0.5 rounded-full text-outline font-label uppercase tracking-widest border border-outline-variant/15">
+                  {anioLabel}
+                </span>
+              )}
+              <span className="text-[9px] bg-surface-container px-2 py-0.5 rounded-full text-outline font-label uppercase tracking-widest border border-outline-variant/15">
+                {cuatriLabel}
+              </span>
+              {nodo.horas != null && (
+                <span className="text-[9px] bg-surface-container px-2 py-0.5 rounded-full text-outline font-label uppercase tracking-widest border border-outline-variant/15">
+                  {nodo.horas}h semanales
+                </span>
+              )}
+              {nodo.nota != null && (
+                <span className="text-[9px] bg-secondary/10 px-2 py-0.5 rounded-full text-secondary font-label uppercase tracking-widest border border-secondary/20">
+                  Nota: {nodo.nota}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <h2 className="text-xl font-headline font-extrabold text-on-surface leading-tight">
+            {nodo.nombre}
+          </h2>
+          <p className="text-[10px] text-outline/60 font-label mt-1">{nodo.codigo}</p>
+        </div>
+
+        {/* Cuerpo scrolleable */}
+        <div className="overflow-y-auto flex-1 px-7 py-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+            {/* Prereqs */}
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.12em] text-outline font-bold font-label mb-3">
+                Para cursarla necesitás
+              </p>
+              {requeridas.length === 0 ? (
+                <p className="text-xs text-outline italic">Sin correlativas previas.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {requeridas.map((edge) => {
+                    const m = lookup.get(edge.desde);
+                    if (!m) return null;
+                    const esAprobada = edge.tipo === "aprobada";
+                    const cuatriM = m.cuatrimestre != null
+                      ? `${CUATRI_ORD[m.cuatrimestre] ?? m.cuatrimestre}° cuatri`
+                      : "Anual";
+                    return (
+                      <li
+                        key={`req-${edge.desde}-${edge.tipo}`}
+                        className="rounded-xl bg-surface-container-high border border-outline-variant/10 overflow-hidden"
+                      >
+                        <div className="px-3 py-2.5 flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-on-surface font-medium leading-snug">{m.nombre}</p>
+                            <p className="text-[9px] text-outline/60 mt-0.5">{m.codigo} · {cuatriM}</p>
+                          </div>
+                          <EstadoBadge estado={m.estado} compact />
+                        </div>
+                        {/* Banda de requisito */}
+                        <div className={`px-3 py-1.5 flex items-center gap-1.5 ${esAprobada ? "bg-tertiary/8 border-t border-tertiary/15" : "bg-primary/8 border-t border-primary/15"}`}>
+                          <span className={`material-symbols-outlined text-[13px] ${esAprobada ? "text-tertiary" : "text-primary"}`}>
+                            {esAprobada ? "school" : "edit_note"}
+                          </span>
+                          <span className={`text-[9px] font-bold uppercase tracking-widest font-label ${esAprobada ? "text-tertiary" : "text-primary"}`}>
+                            {esAprobada ? "Aprobar final" : "Regularizar (aprobar parciales)"}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* Habilita */}
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.12em] text-outline font-bold font-label mb-3">
+                Habilita para cursar
+              </p>
+              {habilita.length === 0 ? (
+                <p className="text-xs text-outline italic">No habilita ninguna materia.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {habilita.map((edge) => {
+                    const m = lookup.get(edge.hacia);
+                    if (!m) return null;
+                    const esAprobada = edge.tipo === "aprobada";
+                    const cuatriM = m.cuatrimestre != null
+                      ? `${CUATRI_ORD[m.cuatrimestre] ?? m.cuatrimestre}° cuatri`
+                      : "Anual";
+                    return (
+                      <li
+                        key={`hab-${edge.hacia}-${edge.tipo}`}
+                        className="rounded-xl bg-surface-container-high border border-outline-variant/10 overflow-hidden"
+                      >
+                        <div className="px-3 py-2.5 flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-on-surface font-medium leading-snug truncate">{m.nombre}</p>
+                            <p className="text-[9px] text-outline/60 mt-0.5">{m.codigo} · {cuatriM}</p>
+                          </div>
+                          <EstadoBadge estado={m.estado} compact />
+                        </div>
+                        <div className={`px-3 py-1 flex items-center gap-1.5 ${esAprobada ? "bg-tertiary/8 border-t border-tertiary/15" : "bg-primary/8 border-t border-primary/15"}`}>
+                          <span className={`text-[9px] font-bold uppercase tracking-widest font-label ${esAprobada ? "text-tertiary" : "text-primary"}`}>
+                            {esAprobada ? "Requiere aprobar final" : "Requiere regularizar"}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -344,10 +561,10 @@ function TabToggle({
       type="button"
       onClick={onClick}
       className={[
-        "px-5 py-2 rounded-xl text-sm font-bold tracking-wide transition-all font-label",
+        "px-5 py-2 rounded-xl text-sm font-bold tracking-wide transition-all duration-200 font-label",
         activo
-          ? "bg-primary text-on-primary shadow-[0_0_20px_rgba(173,198,255,0.25)]"
-          : "bg-surface-container-high/40 text-on-surface-variant hover:bg-surface-container-high",
+          ? "bg-primary/20 text-primary shadow-[inset_0_0_0_1px_rgba(173,198,255,0.3)]"
+          : "text-outline hover:text-on-surface",
       ].join(" ")}
     >
       {label}

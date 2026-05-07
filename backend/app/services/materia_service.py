@@ -56,6 +56,20 @@ def construir_grafo(
         if usuario_id is not None
         else {}
     )
+
+    # Metricas globales cross-tab (una sola query extra con todas las materias).
+    todas_las_materias = materia_repo.list_materias(db) if usuario_id is not None else []
+    carga_horaria_cursando = sum(
+        m.horas or 0
+        for m in todas_las_materias
+        if condiciones.get(m.codigo, CondicionMateria.NONE) == CondicionMateria.CURSANDO
+    )
+    creditos_electivas = sum(
+        m.horas or 0
+        for m in todas_las_materias
+        if m.tipo == "electiva"
+        and condiciones.get(m.codigo, CondicionMateria.NONE) == CondicionMateria.APROBADO
+    )
     notas = (
         materia_repo.notas_usuario(db, usuario_id)
         if usuario_id is not None
@@ -112,6 +126,8 @@ def construir_grafo(
         libres=contadores["libre"],
         total=total,
         porcentaje_aprobadas=porcentaje,
+        carga_horaria_cursando=carga_horaria_cursando,
+        creditos_electivas=creditos_electivas,
     )
 
     registros_usuario = {
@@ -120,12 +136,44 @@ def construir_grafo(
         if condicion != CondicionMateria.NONE
     }
 
+    # Nodos de otras pestanas referenciados en edges (ej: troncales en grafos de electivas).
+    codigos_set = set(codigos)
+    externos_codigos = {
+        corr.materia_requerida
+        for corr in correlativas
+        if corr.materia_requerida not in codigos_set
+    }
+    nodos_externos: list[MateriaNodo] = []
+    if externos_codigos:
+        ext_materias = materia_repo.get_by_codigos(db, externos_codigos)
+        for m in ext_materias:
+            condicion_ext = condiciones.get(m.codigo, CondicionMateria.NONE)
+            estado_ext = calcular_estado(
+                materia=m,
+                condicion_actual=condicion_ext,
+                correlativas=[],
+                condiciones_por_codigo=condiciones,
+            )
+            nodos_externos.append(
+                MateriaNodo(
+                    codigo=m.codigo,
+                    nombre=m.nombre,
+                    anio_carrera=m.anio_carrera,
+                    cuatrimestre=m.cuatrimestre,
+                    horas=m.horas,
+                    tipo=m.tipo,  # type: ignore[arg-type]
+                    estado=estado_ext,
+                    nota=notas.get(m.codigo),
+                )
+            )
+
     return GrafoResponse(
         tipo=tipo,
         nodos=nodos,
         edges=edges,
         contadores=contadores_grafo,
         registros_usuario=registros_usuario,
+        nodos_externos=nodos_externos,
     )
 
 

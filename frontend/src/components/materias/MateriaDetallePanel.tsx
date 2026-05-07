@@ -1,5 +1,8 @@
 import type { CorrelativaEdge, MateriaNodo } from "@/lib/types";
 
+const ANIO_ORD: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
+const CUATRI_ORD: Record<number, string> = { 1: "1er", 2: "2do" };
+
 interface Props {
   nodo: MateriaNodo;
   edges: CorrelativaEdge[];
@@ -18,6 +21,13 @@ export function MateriaDetallePanel({ nodo, edges, todosLosNodos, onClose }: Pro
 
   const lookup = new Map(todosLosNodos.map((n) => [n.codigo, n] as const));
 
+  const anioLabel = nodo.anio_carrera != null
+    ? `${ANIO_ORD[nodo.anio_carrera] ?? `${nodo.anio_carrera}°`} Año`
+    : null;
+  const cuatriLabel = nodo.cuatrimestre != null
+    ? `${CUATRI_ORD[nodo.cuatrimestre] ?? `${nodo.cuatrimestre}°`} Cuatrimestre`
+    : null;
+
   return (
     <section className="bg-surface-container-high/40 border border-outline-variant/10 rounded-3xl p-8 relative overflow-hidden">
       <button
@@ -32,7 +42,9 @@ export function MateriaDetallePanel({ nodo, edges, todosLosNodos, onClose }: Pro
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
           <p className="text-[10px] uppercase tracking-widest font-bold text-outline mb-1 font-label">
-            {nodo.codigo} · {nodo.anio_carrera}o anio · {nodo.cuatrimestre}o cuatri
+            {nodo.codigo}
+            {anioLabel && ` · ${anioLabel}`}
+            {cuatriLabel && ` · ${cuatriLabel}`}
           </p>
           <h3 className="text-2xl font-headline font-extrabold text-on-surface mb-4">
             {nodo.nombre}
@@ -123,7 +135,7 @@ const ESTADO_LABEL: Record<MateriaNodo["estado"], { label: string; cls: string }
   libre: { label: "Bloqueada", cls: "bg-outline-variant/30 text-outline" },
 };
 
-function EstadoBadge({
+export function EstadoBadge({
   estado,
   compact = false,
 }: {

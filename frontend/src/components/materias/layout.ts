@@ -14,7 +14,7 @@ export const NODE_H = 86;
 export const COL_W = 280;
 export const ROW_H = 110;
 export const PAD_X = 60;
-export const PAD_Y = 60;
+export const PAD_Y = 80;
 
 export interface NodoPos {
   x: number;
