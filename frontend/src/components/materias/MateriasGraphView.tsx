@@ -90,25 +90,71 @@ function computarEstados(
   return nodos.map((n) => ({ ...n, estado: computed.get(n.codigo) ?? n.estado }));
 }
 
-/** Calcula los contadores KPI desde los nodos efectivos (en tiempo real).
- *  Los campos cross-tab (carga_horaria_cursando, creditos_electivas) se toman
- *  del servidor ya que requieren datos de ambas pestanas. */
-function computarContadores(nodos: MateriaNodo[], serverContadores: ContadoresGrafo): ContadoresGrafo {
-  const aprobadas = nodos.filter((n) => n.estado === "aprobado").length;
-  const regulares = nodos.filter((n) => n.estado === "regular").length;
-  const cursando = nodos.filter((n) => n.estado === "cursando").length;
-  const cursables = nodos.filter((n) => n.estado === "cursable").length;
-  const total = nodos.length;
+/**
+ * Calcula contadores KPI en tiempo real.
+ *
+ * Para los campos cross-tab (`carga_horaria_cursando`, `creditos_electivas`)
+ * usamos el valor del servidor como base y aplicamos el delta de cambios de la
+ * pestaña actual. Así reflejan cada click sin esperar al siguiente fetch.
+ *
+ * Ejemplo: si el servidor reporta 7h cursando (troncales) y el usuario marca
+ * una materia de 4h como cursando, el contador sube a 11h de inmediato.
+ */
+// Materias optativas excluidas del total y % de avance (igual que en el backend).
+const MATERIAS_OPCIONALES = new Set(["ADUSI"]);
+
+function computarContadores(
+  nodosEfectivos: MateriaNodo[],
+  nodosInicial: MateriaNodo[],
+  serverContadores: ContadoresGrafo,
+): ContadoresGrafo {
+  const aprobadas = nodosEfectivos.filter((n) => n.estado === "aprobado" && !MATERIAS_OPCIONALES.has(n.codigo)).length;
+  const regulares = nodosEfectivos.filter((n) => n.estado === "regular").length;
+  const cursando  = nodosEfectivos.filter((n) => n.estado === "cursando").length;
+  const cursables = nodosEfectivos.filter((n) => n.estado === "cursable").length;
+  const total     = nodosEfectivos.length;
+
+  // Porcentaje excluye ADUSI (no obligatoria para graduarse).
+  // El total de obligatorias viene del servidor (ya lo filtra el backend).
+  const aprobadasObligatorias = nodosEfectivos.filter(
+    (n) => n.estado === "aprobado" && !MATERIAS_OPCIONALES.has(n.codigo),
+  ).length;
+  const totalObligatorias = serverContadores.total; // ya excluye ADUSI
+
+  // Delta de horas cursando respecto al estado inicial del servidor
+  const horasInicial  = nodosInicial
+    .filter((n) => n.estado === "cursando")
+    .reduce((s, n) => s + (n.horas ?? 0), 0);
+  const horasActual   = nodosEfectivos
+    .filter((n) => n.estado === "cursando")
+    .reduce((s, n) => s + (n.horas ?? 0), 0);
+
+  // Delta de créditos de electivas aprobadas
+  const creditosInicial = nodosInicial
+    .filter((n) => n.tipo === "electiva" && n.estado === "aprobado")
+    .reduce((s, n) => s + (n.horas ?? 0), 0);
+  const creditosActual  = nodosEfectivos
+    .filter((n) => n.tipo === "electiva" && n.estado === "aprobado")
+    .reduce((s, n) => s + (n.horas ?? 0), 0);
+
   return {
     aprobadas,
     regulares,
     cursando,
     cursables,
     libres: total - aprobadas - regulares - cursando - cursables,
-    total,
-    porcentaje_aprobadas: total > 0 ? (aprobadas / total) * 100 : 0,
-    carga_horaria_cursando: serverContadores.carga_horaria_cursando,
-    creditos_electivas: serverContadores.creditos_electivas,
+    total: totalObligatorias,
+    porcentaje_aprobadas: totalObligatorias > 0
+      ? (aprobadasObligatorias / totalObligatorias) * 100
+      : 0,
+    carga_horaria_cursando: Math.max(
+      0,
+      serverContadores.carga_horaria_cursando + (horasActual - horasInicial),
+    ),
+    creditos_electivas: Math.max(
+      0,
+      serverContadores.creditos_electivas + (creditosActual - creditosInicial),
+    ),
     meta_creditos_electivas: serverContadores.meta_creditos_electivas,
   };
 }
@@ -252,10 +298,10 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
     [grafo.nodos, grafo.edges, registros, externalRegistros],
   );
 
-  // Contadores KPI calculados en tiempo real.
+  // Contadores KPI calculados en tiempo real con delta client-side.
   const contadores = useMemo(
-    () => computarContadores(nodosEfectivos, grafo.contadores),
-    [nodosEfectivos, grafo.contadores],
+    () => computarContadores(nodosEfectivos, grafo.nodos, grafo.contadores),
+    [nodosEfectivos, grafo.nodos, grafo.contadores],
   );
 
   const aniosDisponibles = useMemo(() => {
@@ -487,7 +533,7 @@ function MateriaModal({
                             {esAprobada ? "school" : "edit_note"}
                           </span>
                           <span className={`text-[9px] font-bold uppercase tracking-widest font-label ${esAprobada ? "text-tertiary" : "text-primary"}`}>
-                            {esAprobada ? "Necesitás aprobada (final rendido)" : "Necesitás regularizada (parciales aprobados)"}
+                            {esAprobada ? "Necesitás aprobada" : "Necesitás regularizada"}
                           </span>
                         </div>
                       </li>
@@ -524,7 +570,7 @@ function MateriaModal({
                         </div>
                         <div className={`px-3 py-1 flex items-center gap-1.5 ${esAprobada ? "bg-tertiary/10 border-t border-tertiary/20" : "bg-primary/10 border-t border-primary/20"}`}>
                           <span className={`text-[9px] font-bold uppercase tracking-widest font-label ${esAprobada ? "text-tertiary" : "text-primary"}`}>
-                            {esAprobada ? "Con final aprobado" : "Con regularizada"}
+                            {esAprobada ? "Desbloquea al aprobar" : "Desbloquea al regularizar"}
                           </span>
                         </div>
                       </li>

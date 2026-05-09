@@ -25,6 +25,11 @@ from app.schemas.materia import (
 from app.services.correlatividad_service import calcular_estado
 
 
+# Materias optativas que no cuentan para el porcentaje de avance de carrera.
+# ADUSI (Seminario Integrador Profesional) no es obligatoria para graduarse en ISI.
+_MATERIAS_OPCIONALES: frozenset[str] = frozenset({"ADUSI"})
+
+
 def listar_materias(db: Session, *, tipo: str | None = None):
     """Lista plana de materias (para listados sin grafo)."""
     return materia_repo.list_materias(db, tipo=tipo)
@@ -116,15 +121,25 @@ def construir_grafo(
         if _normalizar_tipo_correlativa(corr.tipo) is not None
     ]
 
+    # ADUSI (Seminario Integrador) no es obligatoria para graduarse:
+    # se excluye del total y del porcentaje, pero sigue apareciendo en el grafo.
     total = len(materias)
-    porcentaje = round(contadores["aprobado"] / total * 100, 1) if total else 0.0
+    total_obligatorias = sum(1 for m in materias if m.codigo not in _MATERIAS_OPCIONALES)
+    aprobadas_obligatorias = sum(
+        1 for n in nodos
+        if n.codigo not in _MATERIAS_OPCIONALES and n.estado == "aprobado"
+    )
+    porcentaje = (
+        round(aprobadas_obligatorias / total_obligatorias * 100, 1)
+        if total_obligatorias else 0.0
+    )
     contadores_grafo = ContadoresGrafo(
-        aprobadas=contadores["aprobado"],
+        aprobadas=aprobadas_obligatorias,
         regulares=contadores["regular"],
         cursando=contadores["cursando"],
         cursables=contadores["cursable"],
         libres=contadores["libre"],
-        total=total,
+        total=total_obligatorias,
         porcentaje_aprobadas=porcentaje,
         carga_horaria_cursando=carga_horaria_cursando,
         creditos_electivas=creditos_electivas,
