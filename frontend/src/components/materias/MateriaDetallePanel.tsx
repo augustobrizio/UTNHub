@@ -1,7 +1,7 @@
 import type { CorrelativaEdge, MateriaNodo } from "@/lib/types";
+import { cuatriLabel } from "./layout";
 
 const ANIO_ORD: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
-const CUATRI_ORD: Record<number, string> = { 1: "1er", 2: "2do" };
 
 interface Props {
   nodo: MateriaNodo;
@@ -24,9 +24,7 @@ export function MateriaDetallePanel({ nodo, edges, todosLosNodos, onClose }: Pro
   const anioLabel = nodo.anio_carrera != null
     ? `${ANIO_ORD[nodo.anio_carrera] ?? `${nodo.anio_carrera}°`} Año`
     : null;
-  const cuatriLabel = nodo.cuatrimestre != null
-    ? `${CUATRI_ORD[nodo.cuatrimestre] ?? `${nodo.cuatrimestre}°`} Cuatrimestre`
-    : null;
+  const cuatriLabelStr = cuatriLabel(nodo.cuatrimestre);
 
   return (
     <section className="bg-surface-container-high/40 border border-outline-variant/10 rounded-3xl p-8 relative overflow-hidden">
@@ -44,7 +42,7 @@ export function MateriaDetallePanel({ nodo, edges, todosLosNodos, onClose }: Pro
           <p className="text-[10px] uppercase tracking-widest font-bold text-outline mb-1 font-label">
             {nodo.codigo}
             {anioLabel && ` · ${anioLabel}`}
-            {cuatriLabel && ` · ${cuatriLabel}`}
+            {cuatriLabelStr && ` · ${cuatriLabelStr}`}
           </p>
           <h3 className="text-2xl font-headline font-extrabold text-on-surface mb-4">
             {nodo.nombre}

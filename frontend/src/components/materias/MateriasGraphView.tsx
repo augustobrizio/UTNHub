@@ -16,6 +16,7 @@ import { HeaderStats } from "./HeaderStats";
 import { Filtros } from "./Filtros";
 import { LeyendaEstados } from "./LeyendaEstados";
 import { MateriaDetallePanel, EstadoBadge } from "./MateriaDetallePanel";
+import { cuatriSortKey, cuatriLabel } from "./layout";
 
 const USUARIO_ID = 1;
 
@@ -58,8 +59,8 @@ function computarEstados(
   }
 
   const sorted = [...nodos].sort((a, b) => {
-    const ay = (a.anio_carrera ?? 99) * 10 + (a.cuatrimestre ?? 9);
-    const by = (b.anio_carrera ?? 99) * 10 + (b.cuatrimestre ?? 9);
+    const ay = (a.anio_carrera ?? 99) * 10 + cuatriSortKey(a.cuatrimestre);
+    const by = (b.anio_carrera ?? 99) * 10 + cuatriSortKey(b.cuatrimestre);
     return ay - by;
   });
 
@@ -427,7 +428,6 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
 // ---------------------------------------------------------------------------
 
 const ANIO_ORD: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
-const CUATRI_ORD: Record<number, string> = { 1: "1er", 2: "2do" };
 
 function MateriaModal({
   nodo,
@@ -447,9 +447,7 @@ function MateriaModal({
   const anioLabel = nodo.anio_carrera != null
     ? `${ANIO_ORD[nodo.anio_carrera] ?? `${nodo.anio_carrera}°`} Año`
     : null;
-  const cuatriLabel = nodo.cuatrimestre != null
-    ? `${CUATRI_ORD[nodo.cuatrimestre] ?? `${nodo.cuatrimestre}°`} Cuatrimestre`
-    : "Anual";
+  const cuatriLabelStr = cuatriLabel(nodo.cuatrimestre) ?? "Anual";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -478,7 +476,7 @@ function MateriaModal({
                 </span>
               )}
               <span className="text-[9px] bg-surface-container px-2 py-0.5 rounded-full text-outline font-label uppercase tracking-widest border border-outline-variant/15">
-                {cuatriLabel}
+                {cuatriLabelStr}
               </span>
               {nodo.horas != null && (
                 <span className="text-[9px] bg-surface-container px-2 py-0.5 rounded-full text-outline font-label uppercase tracking-widest border border-outline-variant/15">
@@ -516,9 +514,7 @@ function MateriaModal({
                     const m = lookup.get(edge.desde);
                     if (!m) return null;
                     const esAprobada = edge.tipo === "aprobada";
-                    const cuatriM = m.cuatrimestre != null
-                      ? `${CUATRI_ORD[m.cuatrimestre] ?? m.cuatrimestre}° cuatrimestre`
-                      : "Anual";
+                    const cuatriM = cuatriLabel(m.cuatrimestre) ?? "Anual";
                     return (
                       <li
                         key={`req-${edge.desde}-${edge.tipo}`}
@@ -556,9 +552,7 @@ function MateriaModal({
                     const m = lookup.get(edge.hacia);
                     if (!m) return null;
                     const esAprobada = edge.tipo === "aprobada";
-                    const cuatriM = m.cuatrimestre != null
-                      ? `${CUATRI_ORD[m.cuatrimestre] ?? m.cuatrimestre}° cuatrimestre`
-                      : "Anual";
+                    const cuatriM = cuatriLabel(m.cuatrimestre) ?? "Anual";
                     return (
                       <li
                         key={`hab-${edge.hacia}-${edge.tipo}`}

@@ -82,7 +82,7 @@ class Materia(Base):
     codigo: Mapped[str] = mapped_column(Text, primary_key=True)
     nombre: Mapped[str] = mapped_column(Text, nullable=False)
     anio_carrera: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    cuatrimestre: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cuatrimestre: Mapped[str | None] = mapped_column(Text, nullable=True)
     creditos: Mapped[int | None] = mapped_column(Integer, nullable=True)
     horas: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tipo: Mapped[str | None] = mapped_column(Text, nullable=True)

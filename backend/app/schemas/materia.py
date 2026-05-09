@@ -25,7 +25,7 @@ class MateriaOut(BaseModel):
     codigo: str
     nombre: str
     anio_carrera: int | None = None
-    cuatrimestre: int | None = None
+    cuatrimestre: str | None = None
     horas: int | None = None
     creditos: int | None = None
     tipo: TipoMateriaLiteral | None = None
@@ -52,7 +52,7 @@ class MateriaNodo(BaseModel):
     codigo: str
     nombre: str
     anio_carrera: int | None = None
-    cuatrimestre: int | None = None
+    cuatrimestre: str | None = None
     horas: int | None = None
     tipo: TipoMateriaLiteral | None = None
     estado: EstadoMateriaLiteral = Field(

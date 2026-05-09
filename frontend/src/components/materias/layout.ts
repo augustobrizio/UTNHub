@@ -1,4 +1,28 @@
-import type { MateriaNodo } from "@/lib/types";
+import type { Cuatrimestre, MateriaNodo } from "@/lib/types";
+
+/**
+ * Convierte el valor de cuatrimestre (string) a un numero para ordenar.
+ * '1' -> 1, '2' -> 2, 'anual' y '1 y 2' -> 1.5 (entre ambos cuatrimestres).
+ */
+export function cuatriSortKey(c: Cuatrimestre | null | undefined): number {
+  if (c === "1") return 1;
+  if (c === "2") return 2;
+  return 1.5; // anual, '1 y 2', null
+}
+
+/**
+ * Devuelve el label de display para cuatrimestre.
+ * '1' -> '1er Cuatrimestre', '2' -> '2do Cuatrimestre',
+ * '1 y 2' -> '1er y 2do Cuatrimestre', 'anual' -> 'Anual'.
+ */
+export function cuatriLabel(c: Cuatrimestre | null | undefined): string | null {
+  if (!c) return null;
+  if (c === "1") return "1er Cuatrimestre";
+  if (c === "2") return "2do Cuatrimestre";
+  if (c === "1 y 2") return "1er y 2do Cuatrimestre";
+  if (c === "anual") return "Anual";
+  return c;
+}
 
 /**
  * Autolayout por columnas: una columna por anio.
@@ -51,8 +75,8 @@ export function layoutGrafo(nodos: MateriaNodo[]): LayoutResult {
   // Ordenar dentro de cada grupo
   for (const lista of grupos.values()) {
     lista.sort((a, b) => {
-      const ca = a.cuatrimestre ?? 99;
-      const cb = b.cuatrimestre ?? 99;
+      const ca = cuatriSortKey(a.cuatrimestre);
+      const cb = cuatriSortKey(b.cuatrimestre);
       if (ca !== cb) return ca - cb;
       return a.codigo.localeCompare(b.codigo);
     });
