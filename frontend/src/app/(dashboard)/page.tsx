@@ -1,76 +1,148 @@
-import Link from "next/link";
+import { ApiError, getGrafo } from "@/lib/api";
+import type { ContadoresGrafo, GrafoResponse } from "@/lib/types";
 
-/**
- * Home del dashboard. Por ahora es una landing minima con accesos
- * directos. Se va a llenar a medida que armemos las otras pestanas.
- */
-export default function DashboardHome() {
-  return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <header className="mb-12 space-y-2">
-        <p className="text-[10px] uppercase tracking-widest font-bold text-outline font-label">
-          Welcome back
-        </p>
-        <h1 className="text-4xl font-extrabold tracking-tight font-headline text-on-surface">
-          Hola, Julian.
-        </h1>
-        <p className="text-on-surface-variant max-w-2xl">
-          Tu asistente integral de UTN FRRO. Toda la informacion dispersa
-          (web, calendario, profesores, novedades) en un solo lugar.
-        </p>
-      </header>
+import { ProgresoHero } from "@/components/dashboard/ProgresoHero";
+import { AgendaHoy, type AgendaItem } from "@/components/dashboard/AgendaHoy";
+import { ChatSnippet } from "@/components/dashboard/ChatSnippet";
+import { AccionesRapidas } from "@/components/dashboard/AccionesRapidas";
+import {
+  NovedadesAlertas,
+  type NovedadAlerta,
+} from "@/components/dashboard/NovedadesAlertas";
+import { AtajosToolbox } from "@/components/dashboard/AtajosToolbox";
 
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <QuickLink
-          href="/materias"
-          icon="account_tree"
-          title="Grafo de Correlativas"
-          description="Mapa interactivo del plan de estudios. Que materias podes cursar, cuales te faltan."
-        />
-        <QuickLink
-          href="/chat"
-          icon="smart_toy"
-          title="Chatbot"
-          description="Pregunta sobre regimen academico, profesores o novedades. Respuestas con fuentes."
-        />
-        <QuickLink
-          href="/calendario"
-          icon="calendar_month"
-          title="Calendario"
-          description="Inscripciones, finales y fechas clave del cuatrimestre."
-        />
-      </section>
-    </div>
-  );
+// Hardcoded mientras no hay auth — alineado con lo que ya hace materias/page.tsx.
+// Cuando exista AuthProvider real, esto pasa a venir de la sesion.
+const USUARIO_ID = 1;
+const NOMBRE = "Julian";
+const CARRERA = "Ingenieria en Sistemas - 3er Anio";
+
+// Fallback de contadores si el backend no responde. Mantiene la UI usable
+// y evita arrastrar un null por todo el render.
+const CONTADORES_VACIOS: ContadoresGrafo = {
+  aprobadas: 0,
+  regulares: 0,
+  cursando: 0,
+  cursables: 0,
+  libres: 0,
+  total: 0,
+  porcentaje_aprobadas: 0,
+  carga_horaria_cursando: 0,
+  creditos_electivas: 0,
+  meta_creditos_electivas: 0,
+};
+
+// ---------------------------------------------------------------------------
+// Mocks — se reemplazan por endpoints cuando esten implementados.
+// La forma del dato ya respeta el contrato que va a exponer el BE.
+// ---------------------------------------------------------------------------
+
+const AGENDA_MOCK: AgendaItem[] = [
+  {
+    id: "ds-teorica",
+    titulo: "Diseno de Sistemas (teoria)",
+    detalle: "Aula M-12 - Prof. Brignole",
+    hora: "14:00",
+    duracionMin: 90,
+    icono: "schema",
+  },
+  {
+    id: "bd2-lab",
+    titulo: "Bases de Datos II - laboratorio",
+    detalle: "Lab L-3 - hibrido",
+    hora: "16:30",
+    duracionMin: 120,
+    icono: "database",
+  },
+];
+
+const NOVEDADES_MOCK: NovedadAlerta[] = [
+  {
+    id: "paro-adutn",
+    categoria: "Paro academico",
+    titulo: "Paro docente del 09/05",
+    resumen:
+      "ADUTN convoco a 24h de paro. Verifica el campus virtual antes de salir de tu casa: hay clases que pasan a virtual.",
+    severidad: "critica",
+  },
+  {
+    id: "insc-finales",
+    categoria: "Administrativo",
+    titulo: "Inscripcion a finales de mayo",
+    resumen:
+      "La ventana de inscripcion al turno de mayo cierra el viernes 16 a las 23:59. Recorda chequear correlativas para rendir.",
+    severidad: "importante",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function obtenerGrafoSeguro(): Promise<{
+  grafo: GrafoResponse | null;
+  error: string | null;
+}> {
+  try {
+    const grafo = await getGrafo({ tipo: "troncal", usuarioId: USUARIO_ID });
+    return { grafo, error: null };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return { grafo: null, error: `Backend devolvio ${err.status}.` };
+    }
+    if (err instanceof Error) return { grafo: null, error: err.message };
+    return { grafo: null, error: "Error desconocido." };
+  }
 }
 
-function QuickLink({
-  href,
-  icon,
-  title,
-  description,
-}: {
-  href: string;
-  icon: string;
-  title: string;
-  description: string;
-}) {
+// ---------------------------------------------------------------------------
+// Pagina principal del dashboard
+// ---------------------------------------------------------------------------
+
+export default async function DashboardHome() {
+  const { grafo, error } = await obtenerGrafoSeguro();
+  const contadores = grafo?.contadores ?? CONTADORES_VACIOS;
+  const enCursada = contadores.cursando;
+
   return (
-    <Link
-      href={href}
-      className="group block bg-surface-container-high/40 hover:bg-surface-container-high p-6 rounded-2xl border border-outline-variant/10 transition-all"
-    >
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-          <span className="material-symbols-outlined">{icon}</span>
+    <div className="p-6 md:p-8 max-w-[1400px] mx-auto space-y-6">
+      {error && (
+        <div className="bg-error/10 border border-error/30 rounded-2xl px-4 py-3 text-sm text-error font-medium">
+          No pude traer tu progreso del backend ({error}). Mostrando dashboard
+          en modo degradado.
         </div>
-        <div className="flex-1">
-          <h3 className="font-headline font-bold text-lg text-on-surface mb-1 group-hover:text-primary transition-colors">
-            {title}
-          </h3>
-          <p className="text-sm text-on-surface-variant leading-relaxed">{description}</p>
+      )}
+
+      <ProgresoHero
+        nombre={NOMBRE}
+        carrera={CARRERA}
+        contadores={contadores}
+        enCursada={enCursada}
+        esMock={!grafo}
+      />
+
+      {/* Bento grid: 12 columnas, asimetrico segun DESIGN.md */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="md:col-span-8">
+          <AgendaHoy items={AGENDA_MOCK} esMock />
+        </div>
+        <div className="md:col-span-4">
+          <ChatSnippet
+            ultimaPregunta={null}
+            haceTexto={null}
+            conversacionId={null}
+          />
+        </div>
+        <div className="md:col-span-4">
+          <AccionesRapidas />
+        </div>
+        <div className="md:col-span-8">
+          <NovedadesAlertas novedades={NOVEDADES_MOCK} esMock />
+        </div>
+        <div className="md:col-span-12">
+          <AtajosToolbox />
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
