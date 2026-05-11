@@ -10,5 +10,6 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-COPY pyproject.toml .
-RUN uv sync --no-dev
+# Copiar ambos archivos para que cambios en cualquiera invaliden el cache
+COPY pyproject.toml uv.lock ./
+RUN uv sync --no-dev --frozen

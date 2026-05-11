@@ -21,6 +21,7 @@
       "httpx>=0.28",
       "python-jose[cryptography]>=3.4",
       "passlib[bcrypt]>=1.7",
+      "rapidfuzz>=3.0",
   ]
 
   [dependency-groups]

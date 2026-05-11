@@ -173,3 +173,59 @@ class UsuarioMateriaOut(BaseModel):
     anio_cursada: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Importacion masiva desde texto pegado de SYSACAD
+# ---------------------------------------------------------------------------
+class PegadoSysacadIn(BaseModel):
+    """Payload del paso 1: el texto copiado del Estado Academico de SYSACAD."""
+
+    texto: str = Field(
+        ...,
+        description=(
+            "Texto pegado directamente de la tabla 'Estado Academico' de SYSACAD. "
+            "Separado por tabs y newlines, como lo copia el browser."
+        ),
+    )
+
+
+class ItemImportMapeado(BaseModel):
+    """Un item con su match en la DB y la condicion parseada."""
+
+    nombre_original: str
+    estado_texto: str
+    materia_codigo: str | None = Field(None, description="None si no se encontro match")
+    materia_nombre: str | None = None
+    confianza: float = Field(..., ge=0.0, le=1.0, description="Score de matching 0-1")
+    condicion: CondicionMateria
+    nota: float | None = None
+    anio_cursada: int | None = None
+    importar: bool = Field(True, description="El alumno puede deseleccionar individualmente")
+
+
+class PreviewImportSysacad(BaseModel):
+    """Respuesta del primer paso: parseo + matching (sin tocar DB)."""
+
+    items: list[ItemImportMapeado]
+    total_parseados: int
+    total_mapeados: int = Field(..., description="Items con confianza >= 0.75")
+    advertencias: list[str] = Field(default_factory=list)
+
+
+class ConfirmarImportIn(BaseModel):
+    """Payload del segundo paso: el alumno confirma que items importar."""
+
+    items: list[ItemImportMapeado]
+    forzar: bool = Field(
+        True,
+        description="Salta validacion de correlativas (historial pasado).",
+    )
+
+
+class ResultadoImportSysacad(BaseModel):
+    """Resultado final de la importacion confirmada."""
+
+    importadas: int
+    omitidas: int
+    errores: list[str] = Field(default_factory=list)

@@ -229,3 +229,15 @@ def delete_usuario_materia(
     db.delete(fila)
     db.flush()
     return True
+
+
+def delete_all_usuario_materias(db: Session, usuario_id: int) -> int:
+    """Borra TODOS los registros de cursada de un usuario.
+
+    Devuelve la cantidad de filas eliminadas.
+    """
+    filas = list_usuario_materias(db, usuario_id)
+    for fila in filas:
+        db.delete(fila)
+    db.flush()
+    return len(filas)

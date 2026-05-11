@@ -2,6 +2,9 @@
 
 Estos endpoints son los que el frontend del grafo va a usar para que el
 usuario marque sus materias como aprobadas, cursando, etc.
+
+Tambien incluye el flujo de importacion masiva desde texto pegado de SYSACAD
+(dos pasos: preview sin tocar DB → confirmar).
 """
 from __future__ import annotations
 
@@ -12,14 +15,26 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import CorrelativasNoCumplidas, MateriaInexistente
 from app.db.session import get_db
-from app.schemas.materia import UsuarioMateriaIn, UsuarioMateriaOut
-from app.services import inscripcion_service
+from app.repositories import materia_repo
+from app.schemas.materia import (
+    ConfirmarImportIn,
+    PegadoSysacadIn,
+    PreviewImportSysacad,
+    ResultadoImportSysacad,
+    UsuarioMateriaIn,
+    UsuarioMateriaOut,
+)
+from app.services import inscripcion_service, sysacad_paste_service
 
 router = APIRouter(
     prefix="/usuarios/{usuario_id}/materias",
     tags=["usuario_materia"],
 )
 
+
+# ---------------------------------------------------------------------------
+# CRUD de cursadas individuales
+# ---------------------------------------------------------------------------
 
 @router.get("", response_model=list[UsuarioMateriaOut])
 def listar_estado(
@@ -104,3 +119,71 @@ def eliminar_estado(
             detail=f"El usuario {usuario_id} no tiene registro para '{codigo}'.",
         )
     db.commit()
+
+
+@router.delete("", status_code=status.HTTP_200_OK)
+def resetear_todos(
+    usuario_id: int,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Elimina TODOS los registros de cursada del usuario.
+
+    Útil para reimportar desde SYSACAD desde cero.
+    Devuelve ``{"eliminados": N}``.
+    """
+    eliminados = materia_repo.delete_all_usuario_materias(db, usuario_id)
+    db.commit()
+    return {"eliminados": eliminados}
+
+
+# ---------------------------------------------------------------------------
+# Importacion masiva desde texto pegado de SYSACAD
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/importar-sysacad/preview",
+    response_model=PreviewImportSysacad,
+    summary="Paso 1: parsear texto pegado de SYSACAD y proponer el mapeo",
+)
+def preview_importar_sysacad(
+    usuario_id: int,  # noqa: ARG001
+    payload: PegadoSysacadIn,
+    db: Annotated[Session, Depends(get_db)],
+) -> PreviewImportSysacad:
+    """Recibe el texto del Estado Academico y devuelve un preview sin tocar la DB.
+
+    El alumno pega el texto de SYSACAD (Ctrl+C de la tabla del browser),
+    el backend parsea las filas y hace fuzzy matching contra las materias
+    existentes para proponer el mapeo.
+
+    - 422 si el texto no contiene filas validas.
+    """
+    try:
+        preview = sysacad_paste_service.parsear_texto(payload.texto, db)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        )
+    return preview
+
+
+@router.post(
+    "/importar-sysacad/confirmar",
+    response_model=ResultadoImportSysacad,
+    summary="Paso 2: aplicar la importacion confirmada por el alumno",
+)
+def confirmar_importar_sysacad(
+    usuario_id: int,
+    payload: ConfirmarImportIn,
+    db: Annotated[Session, Depends(get_db)],
+) -> ResultadoImportSysacad:
+    """Aplica el batch upsert para los items donde ``importar=True``.
+
+    Usa forzar=True para no bloquear historial pasado sin correlativas.
+    """
+    return sysacad_paste_service.confirmar_importacion(
+        db=db,
+        usuario_id=usuario_id,
+        payload=payload,
+    )
