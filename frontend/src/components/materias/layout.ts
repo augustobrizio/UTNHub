@@ -33,12 +33,13 @@ export function cuatriLabel(c: Cuatrimestre | null | undefined): string | null {
  * "Sin anio" al final.
  */
 
-export const NODE_W = 200;
-export const NODE_H = 86;
-export const COL_W = 280;
-export const ROW_H = 110;
-export const PAD_X = 60;
-export const PAD_Y = 80;
+export const NODE_W = 218;
+export const NODE_H = 98;
+export const COL_W = 306;
+export const ROW_H = 122;
+export const PAD_X = 48;
+export const PAD_Y = 106;   // espacio desde el top del SVG hasta el primer nodo
+export const LABEL_Y = 62;  // baseline de las etiquetas de columna (año)
 
 export interface NodoPos {
   x: number;

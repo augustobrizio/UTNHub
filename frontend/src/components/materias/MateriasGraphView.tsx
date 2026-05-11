@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   ContadoresGrafo,
@@ -16,6 +16,8 @@ import { HeaderStats } from "./HeaderStats";
 import { Filtros } from "./Filtros";
 import { LeyendaEstados } from "./LeyendaEstados";
 import { MateriaDetallePanel, EstadoBadge } from "./MateriaDetallePanel";
+import { ImportarSysacadBoton } from "./ImportarSysacadBoton";
+import { AyudaModal } from "./AyudaModal";
 import { cuatriSortKey, cuatriLabel } from "./layout";
 
 const USUARIO_ID = 1;
@@ -191,6 +193,7 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoMateria | "todos">("todos");
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [modalCodigo, setModalCodigo] = useState<string | null>(null);
+  const [ayudaAbierta, setAyudaAbierta] = useState(false);
 
   // Fuente de verdad local: registros explicitos del usuario.
   // Se inicializa con los datos del servidor y se actualiza con cada click.
@@ -202,6 +205,22 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
   // cuando el usuario hace click rapido sobre el mismo nodo.
   const pendingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const intendedState = useRef<Record<string, EstadoMateria | null>>({});
+
+  // Cuando el servidor devuelve datos frescos (router.refresh() tras import/delete),
+  // la referencia de `grafo` cambia → sincronizamos el estado local y cancelamos
+  // debounces pendientes para evitar race conditions.
+  const prevGrafoRef = useRef(grafo);
+  useEffect(() => {
+    if (prevGrafoRef.current === grafo) return;
+    prevGrafoRef.current = grafo;
+    // Cancelar cualquier debounce pendiente
+    for (const cod of Object.keys(pendingTimers.current)) {
+      clearTimeout(pendingTimers.current[cod]);
+      delete pendingTimers.current[cod];
+      delete intendedState.current[cod];
+    }
+    setRegistros(buildRegistros(grafo.nodos));
+  }, [grafo]);
 
   const handleTipoChange = (nuevo: TipoMateria) => {
     // Flush debounces pendientes antes de cambiar de pestaña para que el
@@ -305,6 +324,16 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
     [nodosEfectivos, grafo.nodos, grafo.contadores],
   );
 
+  // Promedio de notas de materias aprobadas con nota cargada.
+  const promedio = useMemo(() => {
+    const conNota = nodosEfectivos.filter((n) => n.estado === "aprobado" && n.nota != null);
+    if (conNota.length === 0) return null;
+    return conNota.reduce((sum, n) => sum + (n.nota ?? 0), 0) / conNota.length;
+  }, [nodosEfectivos]);
+
+  // True si el usuario tiene al menos algún registro cargado.
+  const tieneRegistros = contadores.aprobadas > 0 || contadores.regulares > 0 || contadores.cursando > 0;
+
   const aniosDisponibles = useMemo(() => {
     const anios = new Set<number>();
     for (const n of nodosEfectivos) {
@@ -347,7 +376,7 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto">
 
       {/* Header */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+      <header className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
         <div>
           <p className="text-[9px] uppercase tracking-[0.15em] font-bold text-outline/60 font-label mb-2">
             ISI · Plan 2023
@@ -359,21 +388,69 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
             Visualizá tu avance y planificá tus próximos pasos.
           </p>
         </div>
-        <HeaderStats contadores={contadores} />
+
+        {/* Stats + promedio + botón importar */}
+        <div className="flex flex-col items-end gap-3 shrink-0">
+          <div className="flex items-stretch gap-3">
+            <HeaderStats contadores={contadores} />
+            {promedio !== null && <PromedioCard promedio={promedio} />}
+          </div>
+          <ImportarSysacadBoton usuarioId={USUARIO_ID} />
+        </div>
       </header>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 mb-4 p-1 bg-surface-container/50 rounded-2xl border border-outline-variant/10 w-fit">
-        <TabToggle
-          label="Troncales"
-          activo={tipo === "troncal"}
-          onClick={() => handleTipoChange("troncal")}
-        />
-        <TabToggle
-          label="Electivas"
-          activo={tipo === "electiva"}
-          onClick={() => handleTipoChange("electiva")}
-        />
+      {/* CTA de primera vez — solo cuando no hay ningún registro cargado */}
+      {!tieneRegistros && tipo === "troncal" && (
+        <div className="mb-6 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/6 to-transparent border border-primary/20 px-6 py-5 flex items-start gap-4">
+          <span className="material-symbols-outlined text-[32px] text-primary mt-0.5 shrink-0">
+            school
+          </span>
+          <div>
+            <p className="font-semibold text-on-surface text-base">
+              Cargá tu historial y conocé tu promedio
+            </p>
+            <p className="text-sm text-on-surface-variant mt-0.5">
+              Usá el botón <strong className="text-on-surface">«Importar desde SYSACAD»</strong> arriba a la derecha — copiá tu Estado Académico con Ctrl+A → Ctrl+C y en segundos tenés todo actualizado.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs + Cómo usar */}
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-1 p-1 bg-surface-container/50 rounded-2xl border border-outline-variant/10 w-fit">
+          <TabToggle
+            label="Troncales"
+            activo={tipo === "troncal"}
+            onClick={() => handleTipoChange("troncal")}
+          />
+          <TabToggle
+            label="Electivas"
+            activo={tipo === "electiva"}
+            onClick={() => handleTipoChange("electiva")}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setAyudaAbierta(true)}
+          className={[
+            "relative inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold border transition-all duration-200",
+            !tieneRegistros
+              ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+              : "border-outline-variant/20 bg-surface-container-high text-on-surface-variant hover:text-on-surface hover:border-outline-variant/40",
+          ].join(" ")}
+        >
+          {/* Puntito pulsante cuando no hay datos cargados */}
+          {!tieneRegistros && (
+            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
+            </span>
+          )}
+          <span className="material-symbols-outlined text-[15px]">help</span>
+          ¿Cómo usar?
+        </button>
       </div>
 
       {/* Filtros + leyenda */}
@@ -417,8 +494,20 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
           edges={grafo.edges}
           todosLosNodos={todosLosNodos}
           onClose={() => setModalCodigo(null)}
+          onDelete={async () => {
+            setModalCodigo(null);
+            await eliminarEstado(USUARIO_ID, nodoModal.codigo);
+            setRegistros((prev) => {
+              const next = { ...prev };
+              delete next[nodoModal.codigo];
+              return next;
+            });
+            router.refresh();
+          }}
         />
       )}
+
+      {ayudaAbierta && <AyudaModal onClose={() => setAyudaAbierta(false)} />}
     </div>
   );
 }
@@ -434,12 +523,16 @@ function MateriaModal({
   edges,
   todosLosNodos,
   onClose,
+  onDelete,
 }: {
   nodo: MateriaNodo;
   edges: CorrelativaEdge[];
   todosLosNodos: MateriaNodo[];
   onClose: () => void;
+  onDelete: () => Promise<void>;
 }) {
+  const [deleting, setDeleting] = useState(false);
+  const tieneRegistro = nodo.estado === "aprobado" || nodo.estado === "regular" || nodo.estado === "cursando";
   const requeridas = edges.filter((e) => e.hacia === nodo.codigo);
   const habilita = edges.filter((e) => e.desde === nodo.codigo);
   const lookup = new Map(todosLosNodos.map((n) => [n.codigo, n] as const));
@@ -456,20 +549,12 @@ function MateriaModal({
         className="relative z-10 w-full max-w-xl bg-surface-container border border-outline-variant/20 rounded-3xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header con gradiente */}
-        <div className="px-7 pt-7 pb-5 border-b border-outline-variant/10 shrink-0 bg-surface-container-high rounded-t-3xl">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-lg hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors"
-            aria-label="Cerrar"
-          >
-            <span className="material-symbols-outlined text-[18px]">close</span>
-          </button>
-
-          <div className="flex items-start gap-3 mb-3">
-            <EstadoBadge estado={nodo.estado} />
-            <div className="flex flex-wrap gap-1.5">
+        {/* Header */}
+        <div className="px-7 pt-5 pb-5 border-b border-outline-variant/10 shrink-0 bg-surface-container-high rounded-t-3xl">
+          {/* Fila 1: badges + botones de acción (sin absolute) */}
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <EstadoBadge estado={nodo.estado} />
               {anioLabel && (
                 <span className="text-[9px] bg-surface-container px-2 py-0.5 rounded-full text-outline font-label uppercase tracking-widest border border-outline-variant/15">
                   {anioLabel}
@@ -489,8 +574,34 @@ function MateriaModal({
                 </span>
               )}
             </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {tieneRegistro && (
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={async () => {
+                    setDeleting(true);
+                    await onDelete();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold border transition-all duration-200 border-error/30 text-error hover:bg-error/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Borrar registro"
+                >
+                  <span className="material-symbols-outlined text-[14px]">delete</span>
+                  {deleting ? "Borrando…" : "Borrar registro"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 rounded-lg hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors"
+                aria-label="Cerrar"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
           </div>
 
+          {/* Fila 2: título */}
           <h2 className="text-xl font-headline font-extrabold text-on-surface leading-tight">
             {nodo.nombre}
           </h2>
@@ -602,5 +713,32 @@ function TabToggle({
     >
       {label}
     </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Card de promedio — separada visualmente de HeaderStats
+// ─────────────────────────────────────────────────────────────────────────────
+function PromedioCard({ promedio }: { promedio: number }) {
+  const color =
+    promedio >= 8 ? "text-secondary border-secondary/30 bg-secondary/8" :
+    promedio >= 6 ? "text-tertiary border-tertiary/30 bg-tertiary/8" :
+                   "text-error border-error/30 bg-error/8";
+
+  return (
+    <div
+      className={[
+        "flex flex-col items-center justify-center px-5 py-3 rounded-2xl border shrink-0",
+        color,
+      ].join(" ")}
+    >
+      <span className="text-[9px] uppercase tracking-widest font-bold font-label opacity-70 mb-0.5">
+        Promedio
+      </span>
+      <span className="text-[32px] font-black font-headline leading-none">
+        {promedio.toFixed(2)}
+      </span>
+      <span className="text-[9px] opacity-50 mt-0.5 font-label">sobre 10</span>
+    </div>
   );
 }

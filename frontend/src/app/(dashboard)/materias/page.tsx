@@ -7,22 +7,9 @@ interface PageProps {
   searchParams: Promise<{ tipo?: string; usuario_id?: string }>;
 }
 
-/**
- * Pestana "Grafo/Carrera". Server component: hace el fetch del grafo
- * en el server (cache de Next), y delega filtros + canvas al client
- * component `MateriasGraphView`.
- *
- * Filtros que cambian el query string (`tipo=troncal|electiva`) hacen
- * refetch automatico via Next.
- *
- * Filtros visuales (anio, estado) se aplican client-side sobre el
- * mismo dataset.
- */
 export default async function MateriasPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const tipo: TipoMateria = params.tipo === "electiva" ? "electiva" : "troncal";
-
-  // TODO: cuando haya auth, este id viene de la sesion. Por ahora hardcoded.
   const usuarioId = params.usuario_id ? Number(params.usuario_id) : 1;
 
   let grafo: GrafoResponse | null = null;
@@ -44,7 +31,6 @@ export default async function MateriasPage({ searchParams }: PageProps) {
     return <GrafoErrorState mensaje={errorMsg ?? "No se pudo cargar el grafo."} />;
   }
 
-  // key={tipo} fuerza remount limpio al cambiar de pestaña, evitando
-  // desfases de estado entre el grafo nuevo y los registros locales.
+  // key={tipo} fuerza remount limpio al cambiar de pestaña
   return <MateriasGraphView key={tipo} grafo={grafo} tipo={tipo} />;
 }
