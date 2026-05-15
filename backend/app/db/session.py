@@ -32,9 +32,17 @@ SessionLocal = sessionmaker(
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Dependency de FastAPI: cede una sesión y la cierra al final."""
+    """Dependency de FastAPI: cede una sesión y la cierra al final.
+
+    Si el endpoint propaga una excepción, hacemos rollback para que la
+    sesión no quede en estado inconsistente (típico cuando Neon corta la
+    conexión a mitad de transacción).
+    """
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
