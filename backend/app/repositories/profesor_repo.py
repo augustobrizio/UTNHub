@@ -42,6 +42,28 @@ def list_profesores(db: Session) -> Sequence[Profesor]:
     return db.execute(stmt).scalars().all()
 
 
+def update_email(db: Session, profesor_id: int, email: str) -> None:
+    """Actualiza el email de un profesor."""
+    prof = db.get(Profesor, profesor_id)
+    if prof is None:
+        return
+    prof.email = email
+    db.flush()
+
+
+def existe_materia_profesor(
+    db: Session, *, materia_codigo: str, profesor_id: int
+) -> bool:
+    """True si ya existe la asociación (materia, profesor) en la DB."""
+    stmt = select(MateriaProfesor.id).where(
+        and_(
+            MateriaProfesor.materia_codigo == materia_codigo,
+            MateriaProfesor.profesor_id == profesor_id,
+        )
+    ).limit(1)
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
 # ---------------------------------------------------------------------------
 # HorarioConsulta
 # ---------------------------------------------------------------------------

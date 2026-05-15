@@ -1,0 +1,203 @@
+"""Services que enriquecen el padron de profesores desde las sheets de UTNTAC.
+
+Dos flujos:
+
+- ``sincronizar_mails`` — sheet de mails: matchea por nombre normalizado contra
+  el padron actual; si encuentra al profesor le pone el email (solo si no
+  tenia), y si no lo encuentra lo crea con su email.
+
+- ``sincronizar_catedras`` — sheet de catedras: para cada (asignatura, profesor)
+  upsertea el profesor por nombre normalizado y crea ``materia_profesor`` si
+  la asignatura matchea (fuzzy) contra el plan ISI. Asignaturas que no
+  pertenecen al plan ISI (FISICA, INGLES, etc.) quedan reportadas como
+  no mapeadas pero el profesor igualmente se crea.
+
+Ambos servicios son idempotentes: re-correrlos no genera duplicados ni
+sobreescribe emails ya cargados.
+"""
+from __future__ import annotations
+
+import logging
+import unicodedata
+
+from rapidfuzz import fuzz, process, utils
+from sqlalchemy.orm import Session
+
+from app.db.models.profesor import Profesor
+from app.repositories import materia_repo, profesor_repo
+from app.schemas.profesor import ResultadoSincCatedras, ResultadoSincMails
+from app.scrapers import profesores_utntac_catedras as scraper_catedras
+from app.scrapers import profesores_utntac_mails as scraper_mails
+
+logger = logging.getLogger(__name__)
+
+CONFIANZA_MIN_MATERIA = 0.72
+
+
+def _normalizar_nombre(nombre: str) -> str:
+    """Normaliza a minusculas + sin tildes + colapsando espacios.
+
+    Permite hacer lookup case/accent-insensitive: 'Acero, Verónica' y
+    'ACERO, Veronica' colapsan al mismo key.
+    """
+    nfkd = unicodedata.normalize("NFKD", nombre)
+    sin_tildes = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return " ".join(sin_tildes.lower().split())
+
+
+def _indice_profesores_por_nombre(db: Session) -> dict[str, Profesor]:
+    """Mapa nombre_normalizado -> Profesor (uno por key, el de menor id)."""
+    indice: dict[str, Profesor] = {}
+    for p in profesor_repo.list_profesores(db):
+        if not p.nombre:
+            continue
+        key = _normalizar_nombre(p.nombre)
+        # En caso de colision (no deberia tras la migracion del unique),
+        # conservar el de menor id.
+        if key not in indice or (p.id or 0) < (indice[key].id or 0):
+            indice[key] = p
+    return indice
+
+
+# ---------------------------------------------------------------------------
+# Sheet 1: mails
+# ---------------------------------------------------------------------------
+
+def sincronizar_mails(db: Session) -> ResultadoSincMails:
+    """Lee la sheet de mails y enriquece el padron.
+
+    - Si el profesor existe y no tiene email: se lo seteamos.
+    - Si el profesor existe y ya tiene email: no se toca (no sobreescribe).
+    - Si el profesor no existe: se crea con su email.
+
+    NO hace ``db.commit()`` — eso es responsabilidad del endpoint.
+    """
+    texto = scraper_mails.fetch_csv()
+    items = scraper_mails.parsear_csv(texto)
+
+    indice = _indice_profesores_por_nombre(db)
+
+    emails_seteados = 0
+    emails_ya_existentes = 0
+    profesores_creados = 0
+    errores: list[str] = []
+
+    for item in items:
+        try:
+            key = _normalizar_nombre(item.nombre)
+            existente = indice.get(key)
+            if existente is not None:
+                if existente.email:
+                    emails_ya_existentes += 1
+                else:
+                    profesor_repo.update_email(db, existente.id, item.email)
+                    emails_seteados += 1
+            else:
+                nuevo = profesor_repo.get_or_create_profesor(
+                    db, nombre=item.nombre, email=item.email
+                )
+                indice[key] = nuevo  # evita duplicar si la sheet repite
+                profesores_creados += 1
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Error procesando mail de %s: %s", item.nombre, e)
+            errores.append(f"{item.nombre}: {e}")
+
+    return ResultadoSincMails(
+        filas_procesadas=len(items),
+        emails_seteados=emails_seteados,
+        emails_ya_existentes=emails_ya_existentes,
+        profesores_creados=profesores_creados,
+        errores=errores,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Sheet 2: catedras (profesor + asignatura)
+# ---------------------------------------------------------------------------
+
+def _matchear_materia(
+    nombre_raw: str, opciones: dict[str, str]
+) -> str | None:
+    """Fuzzy match de nombre de asignatura contra el plan. Devuelve codigo o None."""
+    match = process.extractOne(
+        nombre_raw,
+        list(opciones.keys()),
+        scorer=fuzz.token_sort_ratio,
+        processor=utils.default_process,
+        score_cutoff=0,
+    )
+    if match is None:
+        return None
+    nombre_match, score, _ = match
+    if (score / 100.0) < CONFIANZA_MIN_MATERIA:
+        return None
+    return opciones[nombre_match]
+
+
+def sincronizar_catedras(db: Session) -> ResultadoSincCatedras:
+    """Lee la sheet de catedras y crea profesores + materia_profesor.
+
+    - Profesor: upsert por nombre normalizado (case/accent-insensitive).
+    - Asignatura: fuzzy match contra el plan ISI; si no matchea, el profesor
+      se crea igual pero no se crea la asociacion en ``materia_profesor``.
+    - ``materia_profesor`` se inserta solo si el par (codigo, profesor_id)
+      no existe ya — esto preserva las asociaciones cargadas por el scraper
+      de horarios FRRO.
+
+    NO hace ``db.commit()`` — eso es responsabilidad del endpoint.
+    """
+    texto = scraper_catedras.fetch_csv()
+    items = scraper_catedras.parsear_csv(texto)
+
+    indice = _indice_profesores_por_nombre(db)
+    materias = materia_repo.list_materias(db)
+    opciones = {m.nombre: m.codigo for m in materias}
+
+    profesores_creados = 0
+    materia_profesor_creados = 0
+    materia_profesor_ya_existentes = 0
+    asignaturas_no_mapeadas: set[str] = set()
+    errores: list[str] = []
+
+    for item in items:
+        try:
+            key = _normalizar_nombre(item.nombre_profesor)
+            prof = indice.get(key)
+            if prof is None:
+                prof = profesor_repo.get_or_create_profesor(
+                    db, nombre=item.nombre_profesor, email=None
+                )
+                indice[key] = prof
+                profesores_creados += 1
+
+            codigo = _matchear_materia(item.asignatura, opciones)
+            if codigo is None:
+                asignaturas_no_mapeadas.add(item.asignatura)
+                continue
+
+            if profesor_repo.existe_materia_profesor(
+                db, materia_codigo=codigo, profesor_id=prof.id
+            ):
+                materia_profesor_ya_existentes += 1
+            else:
+                profesor_repo.add_materia_profesor(
+                    db, materia_codigo=codigo, profesor_id=prof.id
+                )
+                materia_profesor_creados += 1
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "Error procesando %s / %s: %s",
+                item.nombre_profesor,
+                item.asignatura,
+                e,
+            )
+            errores.append(f"{item.nombre_profesor} ({item.asignatura}): {e}")
+
+    return ResultadoSincCatedras(
+        filas_procesadas=len(items),
+        profesores_creados=profesores_creados,
+        materia_profesor_creados=materia_profesor_creados,
+        materia_profesor_ya_existentes=materia_profesor_ya_existentes,
+        asignaturas_no_mapeadas=sorted(asignaturas_no_mapeadas),
+        errores=errores,
+    )

@@ -56,3 +56,48 @@ class ResultadoSincHorarios(BaseModel):
         ),
     )
     errores: list[str] = Field(default_factory=list)
+
+
+class ResultadoSincMails(BaseModel):
+    """Resultado de POST ``/profesores/sincronizar-mails`` (sheet UTNTAC)."""
+
+    filas_procesadas: int = Field(..., description="Filas con email valido en la sheet")
+    emails_seteados: int = Field(
+        ..., description="Profesores existentes a los que se les puso un email nuevo"
+    )
+    emails_ya_existentes: int = Field(
+        ...,
+        description=(
+            "Profesores que ya tenían email; no se sobreescribe aunque la sheet "
+            "traiga uno distinto."
+        ),
+    )
+    profesores_creados: int = Field(
+        ...,
+        description="Profesores que no estaban en la DB y se insertaron con su email",
+    )
+    advertencias: list[str] = Field(default_factory=list)
+    errores: list[str] = Field(default_factory=list)
+
+
+class ResultadoSincCatedras(BaseModel):
+    """Resultado de POST ``/profesores/sincronizar-catedras-utntac`` (sheet UTNTAC)."""
+
+    filas_procesadas: int = Field(..., description="Pares (asignatura, profesor) de la sheet")
+    profesores_creados: int = Field(
+        ..., description="Profesores nuevos creados desde la sheet"
+    )
+    materia_profesor_creados: int = Field(
+        ..., description="Asociaciones materia<->profesor nuevas insertadas"
+    )
+    materia_profesor_ya_existentes: int = Field(
+        ..., description="Asociaciones que ya estaban en la DB; no se duplican"
+    )
+    asignaturas_no_mapeadas: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Asignaturas de la sheet que no matchearon contra el plan ISI "
+            "(p.ej. FISICA I, INGLES II — pertenecen a otros deptos)."
+        ),
+    )
+    errores: list[str] = Field(default_factory=list)

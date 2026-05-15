@@ -1,9 +1,13 @@
 """Endpoints del dominio profesor.
 
-Por ahora expone:
+Expone:
 - ``GET  /profesores`` — listado completo.
 - ``POST /profesores/sincronizar-horarios`` — scrapea la pagina del Dpto. ISI
   y hace full refresh de ``horario_consulta`` + ``materia_profesor``.
+- ``POST /profesores/sincronizar-mails`` — enriquece emails desde la sheet
+  publica de UTNTAC.
+- ``POST /profesores/sincronizar-catedras-utntac`` — crea catedras desde la
+  sheet de recomendaciones de UTNTAC.
 """
 from __future__ import annotations
 
@@ -15,8 +19,13 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.repositories import profesor_repo
-from app.schemas.profesor import ProfesorOut, ResultadoSincHorarios
-from app.services import profesor_consulta_service
+from app.schemas.profesor import (
+    ProfesorOut,
+    ResultadoSincCatedras,
+    ResultadoSincHorarios,
+    ResultadoSincMails,
+)
+from app.services import profesor_consulta_service, profesor_utntac_service
 
 router = APIRouter(prefix="/profesores", tags=["profesores"])
 
@@ -55,6 +64,66 @@ def sincronizar_horarios(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"No se pudo obtener la pagina de FRRO: {e}",
+        )
+
+    db.commit()
+    return resultado
+
+
+@router.post(
+    "/sincronizar-mails",
+    response_model=ResultadoSincMails,
+    summary="Enriquece emails de profesores desde la sheet UTNTAC",
+)
+def sincronizar_mails(
+    db: Annotated[Session, Depends(get_db)],
+) -> ResultadoSincMails:
+    """Lee la sheet publica de UTNTAC con mails de docentes.
+
+    Para cada fila con email valido: si el profesor existe en el padron y no
+    tiene email, se lo seteamos; si no existe lo creamos. Nunca sobreescribe
+    un email previo.
+
+    - 502 si falla la descarga del Google Sheet.
+    """
+    try:
+        resultado = profesor_utntac_service.sincronizar_mails(db)
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No se pudo obtener la sheet de mails: {e}",
+        )
+
+    db.commit()
+    return resultado
+
+
+@router.post(
+    "/sincronizar-catedras-utntac",
+    response_model=ResultadoSincCatedras,
+    summary="Crea catedras (profesor<->materia) desde la sheet de recomendaciones UTNTAC",
+)
+def sincronizar_catedras_utntac(
+    db: Annotated[Session, Depends(get_db)],
+) -> ResultadoSincCatedras:
+    """Lee la sheet publica de recomendaciones de UTNTAC.
+
+    Crea profesores nuevos (los que aparecen en la sheet y no estaban) y los
+    asocia a la materia correspondiente del plan ISI via ``materia_profesor``.
+    Asignaturas que no pertenecen al plan ISI (FISICA, INGLES, ECONOMIA, etc.)
+    quedan reportadas pero el profesor igualmente se crea.
+
+    Los puntajes/popularidad/recomendaciones de la sheet NO se capturan por
+    ahora (requieren un modelo nuevo).
+
+    - 502 si falla la descarga del Google Sheet.
+    """
+    try:
+        resultado = profesor_utntac_service.sincronizar_catedras(db)
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No se pudo obtener la sheet de catedras: {e}",
         )
 
     db.commit()
