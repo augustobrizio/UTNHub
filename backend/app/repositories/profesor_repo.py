@@ -42,6 +42,20 @@ def list_profesores(db: Session) -> Sequence[Profesor]:
     return db.execute(stmt).scalars().all()
 
 
+def get_profesor_detalle(db: Session, profesor_id: int) -> Profesor | None:
+    """Profesor con sus materias y horarios precargados (1 query + selectinload)."""
+    from sqlalchemy.orm import selectinload
+    stmt = (
+        select(Profesor)
+        .where(Profesor.id == profesor_id)
+        .options(
+            selectinload(Profesor.cargos),
+            selectinload(Profesor.horarios_consulta),
+        )
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
 def update_email(db: Session, profesor_id: int, email: str) -> None:
     """Actualiza el email de un profesor."""
     prof = db.get(Profesor, profesor_id)

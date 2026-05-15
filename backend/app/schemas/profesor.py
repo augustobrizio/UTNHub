@@ -30,6 +30,35 @@ class HorarioConsultaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MateriaProfesorOut(BaseModel):
+    """Asociacion catedra <-> profesor."""
+
+    materia_codigo: str
+    materia_nombre: str | None = None
+    cargo: str | None = None
+    anio: int | None = None
+
+
+class ProfesorDetalleOut(BaseModel):
+    """Vista completa de un profesor: datos + materias que dicta + horarios."""
+
+    id: int
+    nombre: str | None = None
+    email: str | None = None
+    materias: list[MateriaProfesorOut] = Field(default_factory=list)
+    horarios_consulta: list[HorarioConsultaOut] = Field(default_factory=list)
+
+
+class ProfesorListItem(BaseModel):
+    """Item del listado: profesor + contadores rapidos."""
+
+    id: int
+    nombre: str | None = None
+    email: str | None = None
+    cantidad_materias: int = 0
+    cantidad_horarios: int = 0
+
+
 class ResultadoSincHorarios(BaseModel):
     """Resultado de POST ``/profesores/sincronizar-horarios``."""
 

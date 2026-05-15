@@ -17,10 +17,16 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from sqlalchemy import func, select
+from app.db.models.academico import Materia
+from app.db.models.profesor import HorarioConsulta, MateriaProfesor, Profesor
 from app.db.session import get_db
 from app.repositories import profesor_repo
 from app.schemas.profesor import (
-    ProfesorOut,
+    HorarioConsultaOut,
+    MateriaProfesorOut,
+    ProfesorDetalleOut,
+    ProfesorListItem,
     ResultadoSincCatedras,
     ResultadoSincHorarios,
     ResultadoSincMails,
@@ -30,14 +36,82 @@ from app.services import profesor_consulta_service, profesor_utntac_service
 router = APIRouter(prefix="/profesores", tags=["profesores"])
 
 
-@router.get("", response_model=list[ProfesorOut])
+@router.get("", response_model=list[ProfesorListItem])
 def listar_profesores(
     db: Annotated[Session, Depends(get_db)],
-) -> list[ProfesorOut]:
-    """Lista todos los profesores cargados."""
+) -> list[ProfesorListItem]:
+    """Lista todos los profesores con contadores de materias y horarios.
+
+    Una sola query con LEFT JOINs y agregaciones — eficiente incluso con
+    cientos de profesores. Para ver el detalle de uno, usar GET /profesores/{id}.
+    """
+    stmt = (
+        select(
+            Profesor.id,
+            Profesor.nombre,
+            Profesor.email,
+            func.count(func.distinct(MateriaProfesor.materia_codigo)).label("n_mat"),
+            func.count(func.distinct(HorarioConsulta.id)).label("n_hor"),
+        )
+        .outerjoin(MateriaProfesor, MateriaProfesor.profesor_id == Profesor.id)
+        .outerjoin(HorarioConsulta, HorarioConsulta.profesor_id == Profesor.id)
+        .group_by(Profesor.id)
+        .order_by(Profesor.nombre)
+    )
     return [
-        ProfesorOut.model_validate(p) for p in profesor_repo.list_profesores(db)
+        ProfesorListItem(
+            id=row.id,
+            nombre=row.nombre,
+            email=row.email,
+            cantidad_materias=row.n_mat,
+            cantidad_horarios=row.n_hor,
+        )
+        for row in db.execute(stmt).all()
     ]
+
+
+@router.get("/{profesor_id}", response_model=ProfesorDetalleOut)
+def get_profesor(
+    profesor_id: int,
+    db: Annotated[Session, Depends(get_db)],
+) -> ProfesorDetalleOut:
+    """Profesor con sus materias asociadas y horarios de consulta.
+
+    - 404 si no existe el profesor.
+    """
+    prof = profesor_repo.get_profesor_detalle(db, profesor_id)
+    if prof is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Profesor {profesor_id} no existe.",
+        )
+
+    # Cargar nombres de materias en una sola query
+    codigos = [c.materia_codigo for c in prof.cargos]
+    nombres_por_codigo: dict[str, str] = {}
+    if codigos:
+        for cod, nom in db.execute(
+            select(Materia.codigo, Materia.nombre).where(Materia.codigo.in_(codigos))
+        ).all():
+            nombres_por_codigo[cod] = nom
+
+    return ProfesorDetalleOut(
+        id=prof.id,
+        nombre=prof.nombre,
+        email=prof.email,
+        materias=[
+            MateriaProfesorOut(
+                materia_codigo=c.materia_codigo,
+                materia_nombre=nombres_por_codigo.get(c.materia_codigo),
+                cargo=c.cargo,
+                anio=c.anio,
+            )
+            for c in prof.cargos
+        ],
+        horarios_consulta=[
+            HorarioConsultaOut.model_validate(h) for h in prof.horarios_consulta
+        ],
+    )
 
 
 @router.post(
