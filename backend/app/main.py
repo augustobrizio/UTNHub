@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import materias, usuario_materia
+from app.api import materias, profesores, usuario_materia
 
 app = FastAPI(title="UTNHub API")
 
@@ -19,6 +19,7 @@ app.add_middleware(
 )
 
 app.include_router(materias.router)
+app.include_router(profesores.router)
 app.include_router(usuario_materia.router)
 
 
