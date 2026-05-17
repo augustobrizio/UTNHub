@@ -13,6 +13,7 @@ from app.db.models.academico import (  # noqa: F401
     TipoMateria,
     UsuarioMateria,
 )
+from app.db.models.calendario import EventoCalendario, TipoEventoCalendario  # noqa: F401
 from app.db.models.chat import Conversacion, Mensaje  # noqa: F401
 from app.db.models.novedad import (  # noqa: F401
     CategoriaContenido,
@@ -33,6 +34,7 @@ __all__ = [
     "CondicionMateria",
     "Conversacion",
     "Correlatividad",
+    "EventoCalendario",
     "FaqQuestion",
     "FuenteContenido",
     "Horario",
@@ -43,6 +45,7 @@ __all__ = [
     "Novedad",
     "Profesor",
     "TipoCorrelativa",
+    "TipoEventoCalendario",
     "TipoMateria",
     "Usuario",
     "UsuarioMateria",

@@ -1,5 +1,14 @@
-import { ApiError, getGrafo } from "@/lib/api";
-import type { ContadoresGrafo, GrafoResponse } from "@/lib/types";
+import {
+  ApiError,
+  getEventosHoyCalendario,
+  getGrafo,
+  getProximosEventosCalendario,
+} from "@/lib/api";
+import type {
+  ContadoresGrafo,
+  EventoCalendarioOut,
+  GrafoResponse,
+} from "@/lib/types";
 
 import { ProgresoHero } from "@/components/dashboard/ProgresoHero";
 import { AgendaHoy, type AgendaItem } from "@/components/dashboard/AgendaHoy";
@@ -36,25 +45,6 @@ const CONTADORES_VACIOS: ContadoresGrafo = {
 // Mocks — se reemplazan por endpoints cuando esten implementados.
 // La forma del dato ya respeta el contrato que va a exponer el BE.
 // ---------------------------------------------------------------------------
-
-const AGENDA_MOCK: AgendaItem[] = [
-  {
-    id: "ds-teorica",
-    titulo: "Diseno de Sistemas (teoria)",
-    detalle: "Aula M-12 - Prof. Brignole",
-    hora: "14:00",
-    duracionMin: 90,
-    icono: "schema",
-  },
-  {
-    id: "bd2-lab",
-    titulo: "Bases de Datos II - laboratorio",
-    detalle: "Lab L-3 - hibrido",
-    hora: "16:30",
-    duracionMin: 120,
-    icono: "database",
-  },
-];
 
 const NOVEDADES_MOCK: NovedadAlerta[] = [
   {
@@ -95,12 +85,77 @@ async function obtenerGrafoSeguro(): Promise<{
   }
 }
 
+async function obtenerCalendarioSeguro(): Promise<{
+  agenda: AgendaItem[];
+  finalesProximos: number | undefined;
+  error: string | null;
+}> {
+  try {
+    const [hoy, proximos] = await Promise.all([
+      getEventosHoyCalendario("ISI"),
+      getProximosEventosCalendario(20, "ISI"),
+    ]);
+    return {
+      agenda: hoy.map(eventoToAgendaItem),
+      finalesProximos: proximos.filter((e) => e.tipo === "examen").length,
+      error: null,
+    };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return { agenda: [], finalesProximos: undefined, error: `Backend devolvio ${err.status}.` };
+    }
+    if (err instanceof Error) {
+      return { agenda: [], finalesProximos: undefined, error: err.message };
+    }
+    return { agenda: [], finalesProximos: undefined, error: "Error desconocido." };
+  }
+}
+
+function eventoToAgendaItem(evento: EventoCalendarioOut): AgendaItem {
+  const inicio = new Date(evento.fecha_inicio);
+  const fin = evento.fecha_fin ? new Date(evento.fecha_fin) : null;
+  const duracionMin = fin
+    ? Math.max(0, Math.round((fin.getTime() - inicio.getTime()) / 60000))
+    : 0;
+  return {
+    id: evento.id,
+    titulo: evento.titulo,
+    detalle: evento.descripcion ?? etiquetaTipo(evento.tipo),
+    hora: inicio.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
+    duracionMin,
+    icono: iconoTipo(evento.tipo),
+  };
+}
+
+function etiquetaTipo(tipo: EventoCalendarioOut["tipo"]): string {
+  const etiquetas = {
+    examen: "Examen",
+    inscripcion: "Inscripcion",
+    feriado: "Feriado",
+    evento: "Evento",
+  };
+  return etiquetas[tipo];
+}
+
+function iconoTipo(tipo: EventoCalendarioOut["tipo"]): string {
+  const iconos = {
+    examen: "event_upcoming",
+    inscripcion: "edit_calendar",
+    feriado: "beach_access",
+    evento: "calendar_month",
+  };
+  return iconos[tipo];
+}
+
 // ---------------------------------------------------------------------------
 // Pagina principal del dashboard
 // ---------------------------------------------------------------------------
 
 export default async function DashboardHome() {
-  const { grafo, error } = await obtenerGrafoSeguro();
+  const [{ grafo, error }, calendario] = await Promise.all([
+    obtenerGrafoSeguro(),
+    obtenerCalendarioSeguro(),
+  ]);
   const contadores = grafo?.contadores ?? CONTADORES_VACIOS;
   const enCursada = contadores.cursando;
 
@@ -112,19 +167,25 @@ export default async function DashboardHome() {
           en modo degradado.
         </div>
       )}
+      {calendario.error && (
+        <div className="bg-error/10 border border-error/30 rounded-2xl px-4 py-3 text-sm text-error font-medium">
+          No pude traer tu calendario del backend ({calendario.error}).
+        </div>
+      )}
 
       <ProgresoHero
         nombre={NOMBRE}
         carrera={CARRERA}
         contadores={contadores}
         enCursada={enCursada}
+        finalesProximos={calendario.finalesProximos}
         esMock={!grafo}
       />
 
       {/* Bento grid: 12 columnas, asimetrico segun DESIGN.md */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         <div className="md:col-span-8">
-          <AgendaHoy items={AGENDA_MOCK} esMock />
+          <AgendaHoy items={calendario.agenda} esMock={Boolean(calendario.error)} />
         </div>
         <div className="md:col-span-4">
           <ChatSnippet

@@ -137,3 +137,30 @@ export interface ResultadoImportSysacad {
   omitidas: number;
   errores: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Calendario academico - refleja `app/schemas/calendario.py`
+// ---------------------------------------------------------------------------
+
+export type TipoEventoCalendario = "examen" | "inscripcion" | "feriado" | "evento";
+
+export interface EventoCalendarioOut {
+  id: number;
+  titulo: string;
+  descripcion: string | null;
+  fecha_inicio: string;
+  fecha_fin: string | null;
+  tipo: TipoEventoCalendario;
+  carrera: string | null;
+  fuente_url: string | null;
+}
+
+export interface ResultadoSincCalendario {
+  fuentes_procesadas: number;
+  eventos_detectados: number;
+  eventos_creados: number;
+  eventos_actualizados: number;
+  eventos_sin_cambios: number;
+  advertencias: string[];
+  errores: string[];
+}

@@ -7,10 +7,13 @@
  */
 import type {
   ConfirmarImportIn,
+  EventoCalendarioOut,
   GrafoResponse,
   MateriaOut,
   PreviewImportSysacad,
   ResultadoImportSysacad,
+  ResultadoSincCalendario,
+  TipoEventoCalendario,
   TipoMateria,
 } from "./types";
 
@@ -80,6 +83,48 @@ export function getGrafo({ tipo, usuarioId }: GrafoParams): Promise<GrafoRespons
 export function listarMaterias(tipo?: TipoMateria): Promise<MateriaOut[]> {
   const qs = tipo ? `?tipo=${tipo}` : "";
   return request<MateriaOut[]>(`/materias${qs}`);
+}
+
+// ---------------------------------------------------------------------------
+// Endpoints del calendario academico
+// ---------------------------------------------------------------------------
+
+export interface CalendarioParams {
+  desde?: string;
+  hasta?: string;
+  tipo?: TipoEventoCalendario;
+  carrera?: string;
+}
+
+export function listarEventosCalendario(
+  params: CalendarioParams = {},
+): Promise<EventoCalendarioOut[]> {
+  const qs = new URLSearchParams();
+  if (params.desde) qs.set("desde", params.desde);
+  if (params.hasta) qs.set("hasta", params.hasta);
+  if (params.tipo) qs.set("tipo", params.tipo);
+  if (params.carrera !== undefined) qs.set("carrera", params.carrera);
+  const query = qs.toString();
+  return request<EventoCalendarioOut[]>(`/calendario${query ? `?${query}` : ""}`);
+}
+
+export function getProximosEventosCalendario(
+  limite = 5,
+  carrera = "ISI",
+): Promise<EventoCalendarioOut[]> {
+  const qs = new URLSearchParams({ limite: String(limite), carrera });
+  return request<EventoCalendarioOut[]>(`/calendario/proximos?${qs.toString()}`, {
+    revalidate: 30,
+  });
+}
+
+export function getEventosHoyCalendario(
+  carrera = "ISI",
+): Promise<EventoCalendarioOut[]> {
+  const qs = new URLSearchParams({ carrera });
+  return request<EventoCalendarioOut[]>(`/calendario/hoy?${qs.toString()}`, {
+    revalidate: 30,
+  });
 }
 
 // Las mutaciones se enrutan via /api/backend (proxy Next.js) para evitar CORS en browser.
@@ -173,12 +218,29 @@ export async function confirmarImportarSysacad(
   return res.json() as Promise<ResultadoImportSysacad>;
 }
 
+export async function sincronizarCalendario(): Promise<ResultadoSincCalendario> {
+  const res = await fetch(`${MUTATION_BASE}/calendario/sincronizar`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<ResultadoSincCalendario>;
+}
+
 export const api = {
   getGrafo,
   listarMaterias,
+  listarEventosCalendario,
+  getProximosEventosCalendario,
+  getEventosHoyCalendario,
   registrarEstado,
   eliminarEstado,
   resetearTodosRegistros,
   previewImportarSysacad,
   confirmarImportarSysacad,
+  sincronizarCalendario,
 };
