@@ -173,42 +173,62 @@ class UsuarioMateria(Base):
 
 
 class Comision(Base):
-    """Una comisión concreta de cursado de una materia (ej: K3051 año 2025)."""
+    """Una comisión real de cursado (ej: '1K01', '3EK02'). Agrupa varias cursadas."""
 
     __tablename__ = "comision"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    materia_codigo: Mapped[str] = mapped_column(
-        Text, ForeignKey("materia.codigo"), nullable=False, index=True
-    )
     nombre: Mapped[str | None] = mapped_column(Text, nullable=True)
     anio: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    cuatrimestre: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    materia: Mapped[Materia] = relationship()
-    horarios: Mapped[list["Horario"]] = relationship(
+    cursadas: Mapped[list["Cursada"]] = relationship(
         back_populates="comision", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<Comision id={self.id} materia={self.materia_codigo} {self.nombre}>"
+        return f"<Comision id={self.id} nombre={self.nombre!r} anio={self.anio}>"
 
 
-class Horario(Base):
-    """Bloque de horario de una comisión (un día y franja)."""
+class Cursada(Base):
+    """Una materia dentro de una comisión para un cuatrimestre dado."""
 
-    __tablename__ = "horario"
+    __tablename__ = "cursada"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     comision_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("comision.id"), nullable=False, index=True
+    )
+    materia_codigo: Mapped[str] = mapped_column(
+        Text, ForeignKey("materia.codigo"), nullable=False, index=True
+    )
+    cuatrimestre: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    docente: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    comision: Mapped[Comision] = relationship(back_populates="cursadas")
+    materia: Mapped[Materia] = relationship()
+    horarios: Mapped[list["Horario"]] = relationship(
+        back_populates="cursada", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Cursada id={self.id} materia={self.materia_codigo} C{self.cuatrimestre}>"
+
+
+class Horario(Base):
+    """Bloque de horario de una cursada (un día y franja)."""
+
+    __tablename__ = "horario"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cursada_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cursada.id"), nullable=False, index=True
     )
     dia: Mapped[str | None] = mapped_column(Text, nullable=True)
     hora_inicio: Mapped[time | None] = mapped_column(Time, nullable=True)
     hora_fin: Mapped[time | None] = mapped_column(Time, nullable=True)
     aula: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    comision: Mapped[Comision] = relationship(back_populates="horarios")
+    cursada: Mapped["Cursada"] = relationship(back_populates="horarios")
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Horario {self.dia} {self.hora_inicio}-{self.hora_fin} aula={self.aula}>"
