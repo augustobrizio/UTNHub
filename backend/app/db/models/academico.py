@@ -162,8 +162,12 @@ class UsuarioMateria(Base):
     )
     nota: Mapped[float | None] = mapped_column(Float, nullable=True)
     anio_cursada: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cursada_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cursada.id", ondelete="SET NULL"), nullable=True
+    )
 
     materia: Mapped[Materia] = relationship()
+    cursada: Mapped["Cursada | None"] = relationship(foreign_keys=[cursada_id])
 
     def __repr__(self) -> str:  # pragma: no cover
         return (
