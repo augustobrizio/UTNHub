@@ -148,11 +148,19 @@ NOMBRE_A_CODIGO: dict[str, str] = {
     _n("Simulación Flamini-Torres"): "28",
     _n("Simulación Leale-Torres"): "28",
     _n("Soporte a la Gestión de datos con P.Visual"): "E13",
+    _n("Sist. de Inf. Integrados para la Industria"): "E19",
+}
+
+# Strings que aparecen en las celdas del Excel pero no son materias
+NOMBRES_IGNORAR: set[str] = {
+    _n("Inscribirse en la Comisión"),
 }
 
 
 def mapear_codigo(nombre: str) -> str | None:
     key = _n(nombre)
+    if key in NOMBRES_IGNORAR:
+        return "__ignorar__"
     if key in NOMBRE_A_CODIGO:
         return NOMBRE_A_CODIGO[key]
     # Substring fallback para abreviaciones o ligeras variaciones
@@ -227,7 +235,6 @@ def _parse_seccion(rows: list[tuple]) -> list[dict]:
 
             nombre_parcial = f"{name_a} {name_b}".strip()
             if not nombre_parcial:
-                i += 3 if row_b else 2
                 continue
 
             slots.append({
@@ -413,6 +420,8 @@ def seed(excel_dir: Path, anio: int = 2025, reset: bool = False) -> dict:
 
                     if codigo is None:
                         stats["nombres_no_mapeados"].add(nombre_parcial)
+                        continue
+                    if codigo == "__ignorar__":
                         continue
 
                     # Upsert Cursada
