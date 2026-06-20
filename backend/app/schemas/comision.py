@@ -41,6 +41,7 @@ class MateriaCursableOut(BaseModel):
     materia_codigo: str
     materia_nombre: str
     anio_carrera: int | None = None
+    es_anual: bool = False
     cursada_seleccionada_id: int | None = None
     comisiones: list[ComisionCursadaOut] = []
 

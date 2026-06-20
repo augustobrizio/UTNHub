@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSidebar } from "./SidebarContext";
 
 function UtnLogo() {
   const [imgOk, setImgOk] = useState(true);
@@ -24,16 +25,21 @@ function UtnLogo() {
 }
 
 export function TopNav() {
+  const { collapsed } = useSidebar();
   return (
     <nav className="fixed top-0 w-full z-50 h-16 flex items-center gap-4 px-6 bg-surface-container-lowest/90 backdrop-blur-xl border-b border-outline-variant/10">
 
-      {/* Logo + nombre (alineado al inicio) */}
-      <div className="flex items-center gap-3 w-64 shrink-0">
+      {/* Logo + nombre — ancho alineado con la sidebar */}
+      <div
+        className={`flex items-center gap-3 shrink-0 transition-[width] duration-200 ease-out ${collapsed ? "w-9" : "w-56"}`}
+      >
         <UtnLogo />
-        <div className="leading-none">
-          <span className="text-[15px] font-black font-headline tracking-tight text-on-surface">UTNHub</span>
-          <p className="text-[9px] text-outline/55 tracking-[0.12em] uppercase font-label mt-0.5">ISI · UTN FRRO</p>
-        </div>
+        {!collapsed && (
+          <div className="leading-none">
+            <span className="text-[15px] font-black font-headline tracking-tight text-on-surface">UTNHub</span>
+            <p className="text-[9px] text-outline/55 tracking-[0.12em] uppercase font-label mt-0.5">ISI · UTN FRRO</p>
+          </div>
+        )}
       </div>
 
       {/* Search bar — izquierda (después del logo) */}

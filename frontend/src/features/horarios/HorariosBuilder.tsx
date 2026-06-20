@@ -3,7 +3,8 @@
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { seleccionarCursada, deseleccionarCursada } from "@/lib/api";
-import type { ComisionCursadaOut, HorarioOut, MateriaCursableOut } from "@/lib/types";
+import { materiaIcon } from "@/lib/materiaIcon";
+import type { HorarioOut, MateriaCursableOut } from "@/lib/types";
 
 const USUARIO_ID = 1;
 
@@ -26,8 +27,8 @@ const UTN_MODULOS = [
   "21:05", "22:35",
 ];
 
-const DAY_FLOOR = 7;   // antes de las 7 = madrugada → se suma 24 para ordenar clases nocturnas
-const LABEL_W = 54;
+const DAY_FLOOR = 7; // antes de las 7 = madrugada → +24 para ordenar clases nocturnas
+const LABEL_W = 60;
 
 function parseHF(t: string | null): number | null {
   if (!t) return null;
@@ -43,112 +44,234 @@ const moduloH = (t: string) => {
 };
 
 interface Color { rgb: string; text: string; }
+// Orden pensado para máxima separación de tono entre materias consecutivas.
 const PALETTE: Color[] = [
-  { rgb: "173,198,255", text: "#c9d9ff" },
-  { rgb: "125,255,162", text: "#a6ffc3" },
-  { rgb: "255,185,80",  text: "#ffd093" },
-  { rgb: "255,130,130", text: "#ffb0b0" },
-  { rgb: "195,173,247", text: "#d6c8fb" },
-  { rgb: "90,220,220",  text: "#9fe9e9" },
-  { rgb: "255,210,90",  text: "#ffe0a3" },
+  { rgb: "138,180,255", text: "#bcd4ff" }, // azul
+  { rgb: "255,176,72",  text: "#ffce8f" }, // naranja
+  { rgb: "112,240,160", text: "#9cffc2" }, // verde
+  { rgb: "255,120,180", text: "#ffadd0" }, // magenta
+  { rgb: "186,150,255", text: "#d3c2ff" }, // violeta
+  { rgb: "94,222,222",  text: "#a3eded" }, // cyan
+  { rgb: "255,214,92",  text: "#ffe4a5" }, // amarillo
 ];
 
 // ---------------------------------------------------------------------------
-interface Props { materias1: MateriaCursableOut[]; materias2: MateriaCursableOut[]; }
+// Modelo unificado: una materia con sus comisiones cruzando ambos cuatrimestres.
+// Las anuales tienen cursada en c[0] y c[1] (misma comisión todo el año).
+// ---------------------------------------------------------------------------
 
-export function HorariosBuilder({ materias1, materias2 }: Props) {
-  const [cuatrimestre, setCuatrimestre] = useState(0);
-  const [anioFiltro, setAnioFiltro] = useState<number | "E">(() => {
-    const first = materias1;
-    for (let i = 1; i <= 5; i++) if (first.some(m => m.anio_carrera === i)) return i;
-    return "E";
-  });
-  const [selectedCodigo, setSelectedCodigo] = useState<string | null>(null);
-  const [loadingCodigo, setLoadingCodigo] = useState<string | null>(null);
+type Idx = 0 | 1;
+interface MCursada { cursada_id: number; horarios: HorarioOut[]; }
+interface MComision { comision_id: number; comision_nombre: string | null; docente: string | null; c: [MCursada | null, MCursada | null]; }
+interface MMateria {
+  codigo: string; nombre: string; anio: number | null; anual: boolean;
+  comisiones: MComision[]; en: [boolean, boolean]; selId: number | null;
+}
+// cuatri=null → anual (aparece en ambos); 0|1 → cuatrimestre específico
+interface Sel { comisionId: number; cuatri: Idx | null; }
+
+/** Cursada visible de una materia seleccionada para un cuatrimestre dado. */
+function vistaCursada(mat: MMateria, sel: Sel, idx: Idx): { horarios: HorarioOut[]; comision_nombre: string | null } | null {
+  const com = mat.comisiones.find(c => c.comision_id === sel.comisionId);
+  if (!com) return null;
+  if (mat.anual) {
+    const cu = com.c[idx];
+    return cu ? { horarios: cu.horarios, comision_nombre: com.comision_nombre } : null;
+  }
+  if (sel.cuatri === idx) {
+    const cu = com.c[idx];
+    return cu ? { horarios: cu.horarios, comision_nombre: com.comision_nombre } : null;
+  }
+  return null;
+}
+
+function solapan(a: HorarioOut[], b: HorarioOut[]): boolean {
+  for (const h of a) {
+    const hS = parseHF(h.hora_inicio), hE = parseHF(h.hora_fin);
+    if (hS == null || hE == null || !h.dia) continue;
+    const dia = normDia(h.dia);
+    for (const o of b) {
+      if (!o.dia || normDia(o.dia) !== dia) continue;
+      const oS = parseHF(o.hora_inicio), oE = parseHF(o.hora_fin);
+      if (oS == null || oE == null) continue;
+      if (hS < oE && hE > oS) return true;
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+interface Props {
+  materias1: MateriaCursableOut[];
+  materias2: MateriaCursableOut[];
+  cuatriInicial: Idx;
+}
+
+export function HorariosBuilder({ materias1, materias2, cuatriInicial }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  const materias = cuatrimestre === 0 ? materias1 : materias2;
+  const [cuatrimestre, setCuatrimestre] = useState<Idx>(cuatriInicial);
+  const [loadingCodigo, setLoadingCodigo] = useState<string | null>(null);
+  const [dragInfo, setDragInfo] = useState<{ codigo: string; comisionId: number } | null>(null);
 
-  // Dos mapas de selección independientes, uno por cuatrimestre
-  const [selecciones, setSelecciones] = useState<[Map<string, number>, Map<string, number>]>(() => {
-    const mk = (mats: MateriaCursableOut[]) => {
-      const m = new Map<string, number>();
-      for (const mat of mats) if (mat.cursada_seleccionada_id != null) m.set(mat.materia_codigo, mat.cursada_seleccionada_id);
-      return m;
+  // Merge de ambos cuatrimestres en un solo modelo por materia
+  const { mergedList, mergedMap } = useMemo(() => {
+    const map = new Map<string, MMateria>();
+    const add = (mats: MateriaCursableOut[], idx: Idx) => {
+      for (const mat of mats) {
+        let m = map.get(mat.materia_codigo);
+        if (!m) {
+          m = { codigo: mat.materia_codigo, nombre: mat.materia_nombre, anio: mat.anio_carrera, anual: mat.es_anual, comisiones: [], en: [false, false], selId: null };
+          map.set(mat.materia_codigo, m);
+        }
+        m.en[idx] = true;
+        if (mat.es_anual) m.anual = true;
+        if (mat.cursada_seleccionada_id != null) m.selId = mat.cursada_seleccionada_id;
+        for (const c of mat.comisiones) {
+          let mc = m.comisiones.find(x => x.comision_id === c.comision_id);
+          if (!mc) {
+            mc = { comision_id: c.comision_id, comision_nombre: c.comision_nombre, docente: c.docente, c: [null, null] };
+            m.comisiones.push(mc);
+          }
+          mc.c[idx] = { cursada_id: c.cursada_id, horarios: c.horarios };
+          if (!mc.docente && c.docente) mc.docente = c.docente;
+        }
+      }
     };
-    return [mk(materias1), mk(materias2)];
-  });
-  const seleccion = selecciones[cuatrimestre];
-  const setSeleccion = (fn: (p: Map<string, number>) => Map<string, number>) =>
-    setSelecciones(([s1, s2]) => cuatrimestre === 0 ? [fn(s1), s2] : [s1, fn(s2)]);
-
-  // Color estable por materia (asignado una vez sobre la unión de ambas listas)
-  const colorMap = useMemo(() => {
-    const map = new Map<string, Color>();
-    let i = 0;
-    for (const mat of [...materias1, ...materias2]) {
-      if (!map.has(mat.materia_codigo)) { map.set(mat.materia_codigo, PALETTE[i % PALETTE.length]); i++; }
+    add(materias1, 0);
+    add(materias2, 1);
+    for (const m of map.values()) {
+      m.comisiones.sort((a, b) => (a.comision_nombre ?? "").localeCompare(b.comision_nombre ?? ""));
     }
-    return map;
+    const list = [...map.values()].sort((a, b) => (a.anio ?? 99) - (b.anio ?? 99) || a.codigo.localeCompare(b.codigo));
+    return { mergedList: list, mergedMap: map };
   }, [materias1, materias2]);
 
-  const years = [1, 2, 3, 4, 5].filter(y => materias.some(m => m.anio_carrera === y));
-  const tieneElectivas = materias.some(m => m.anio_carrera === null);
+  // Selección inicial: resolver cada cursada_seleccionada_id → comisión + cuatri
+  const [seleccion, setSeleccion] = useState<Map<string, Sel>>(() => {
+    const m = new Map<string, Sel>();
+    for (const mat of mergedMap.values()) {
+      if (mat.selId == null) continue;
+      for (const com of mat.comisiones) {
+        for (const idx of [0, 1] as const) {
+          if (com.c[idx]?.cursada_id === mat.selId) {
+            m.set(mat.codigo, { comisionId: com.comision_id, cuatri: mat.anual ? null : idx });
+          }
+        }
+      }
+    }
+    return m;
+  });
 
-  function switchCuatrimestre(idx: number) {
-    setCuatrimestre(idx);
-    setSelectedCodigo(null);
-    const mats = idx === 0 ? materias1 : materias2;
-    for (let i = 1; i <= 5; i++) { if (mats.some(m => m.anio_carrera === i)) { setAnioFiltro(i); return; } }
-    setAnioFiltro("E");
-  }
+  const [anioFiltro, setAnioFiltro] = useState<number | "E">(() => {
+    for (let i = 1; i <= 5; i++) if (mergedList.some(m => m.anio === i && m.en[cuatriInicial])) return i;
+    return "E";
+  });
 
+  // Índice de color preferido y estable por materia (mismo color en tarjeta y calendario).
+  const hashIndex = (codigo: string) => {
+    let h = 0;
+    for (let k = 0; k < codigo.length; k++) h = (h * 31 + codigo.charCodeAt(k)) >>> 0;
+    return h % PALETTE.length;
+  };
+  const hashColor = (codigo: string) => PALETTE[hashIndex(codigo)];
+
+  // Colores de la agenda: cada materia usa su color preferido; si ya está tomado por
+  // otra materia en el calendario, cae al siguiente libre (garantiza que no se repitan).
+  const colorAsignado = useMemo(() => {
+    const map = new Map<string, Color>();
+    const used = new Set<number>();
+    const pending: string[] = [];
+    for (const codigo of seleccion.keys()) {
+      const pref = hashIndex(codigo);
+      if (!used.has(pref)) { used.add(pref); map.set(codigo, PALETTE[pref]); }
+      else pending.push(codigo);
+    }
+    let n = 0;
+    for (const codigo of pending) {
+      while (used.has(n % PALETTE.length) && used.size < PALETTE.length) n++;
+      const idx = n % PALETTE.length;
+      used.add(idx); map.set(codigo, PALETTE[idx]); n++;
+    }
+    return map;
+  }, [seleccion]);
+
+  // La tarjeta muestra el color que la materia tendrá en el calendario.
+  const colorCard = (codigo: string) => colorAsignado.get(codigo) ?? hashColor(codigo);
+
+  // Materias visibles en el cuatrimestre actual
+  const materiasVista = useMemo(
+    () => mergedList.filter(m => m.en[cuatrimestre]),
+    [mergedList, cuatrimestre],
+  );
+  const years = [1, 2, 3, 4, 5].filter(y => materiasVista.some(m => m.anio === y));
+  const tieneElectivas = materiasVista.some(m => m.anio === null);
+
+  // Las que ya están en la agenda no se muestran en "Materias disponibles".
   const materiasFiltradas = useMemo(
-    () => materias.filter(m => anioFiltro === "E" ? m.anio_carrera === null : m.anio_carrera === anioFiltro),
-    [materias, anioFiltro],
+    () => materiasVista.filter(m =>
+      !seleccion.has(m.codigo) && (anioFiltro === "E" ? m.anio === null : m.anio === anioFiltro),
+    ),
+    [materiasVista, anioFiltro, seleccion],
   );
 
-  const seleccionActiva = useMemo(() => {
-    const res: Array<{ codigo: string; nombre: string; comision_nombre: string | null; horarios: HorarioOut[] }> = [];
-    for (const [codigo, cursadaId] of seleccion.entries()) {
-      const mat = materias.find(m => m.materia_codigo === codigo);
+  // Ocupación (horarios ya elegidos) en un cuatrimestre dado
+  function ocupacion(idx: Idx) {
+    const res: { codigo: string; horarios: HorarioOut[] }[] = [];
+    for (const [codigo, sel] of seleccion) {
+      const mat = mergedMap.get(codigo);
       if (!mat) continue;
-      const c = mat.comisiones.find(c => c.cursada_id === cursadaId);
-      if (!c) continue;
-      res.push({ codigo, nombre: mat.materia_nombre, comision_nombre: c.comision_nombre, horarios: c.horarios });
+      const v = vistaCursada(mat, sel, idx);
+      if (v) res.push({ codigo, horarios: v.horarios });
     }
     return res;
-  }, [seleccion, materias]);
+  }
 
-  function conflicta(cursada: ComisionCursadaOut, materia_codigo: string): boolean {
-    for (const h of cursada.horarios) {
-      const hS = parseHF(h.hora_inicio), hE = parseHF(h.hora_fin);
-      if (hS == null || hE == null || !h.dia) continue;
-      const dia = normDia(h.dia);
-      for (const sel of seleccionActiva) {
-        if (sel.codigo === materia_codigo) continue;
-        for (const sh of sel.horarios) {
-          if (!sh.dia || normDia(sh.dia) !== dia) continue;
-          const sS = parseHF(sh.hora_inicio), sE = parseHF(sh.hora_fin);
-          if (sS == null || sE == null) continue;
-          if (hS < sE && hE > sS) return true;
-        }
+  // Lo que se dibuja en la grilla del cuatrimestre actual
+  const seleccionActiva = useMemo(() => {
+    const res: { codigo: string; nombre: string; comision_nombre: string | null; horarios: HorarioOut[] }[] = [];
+    for (const [codigo, sel] of seleccion) {
+      const mat = mergedMap.get(codigo);
+      if (!mat) continue;
+      const v = vistaCursada(mat, sel, cuatrimestre);
+      if (v) res.push({ codigo, nombre: mat.nombre, comision_nombre: v.comision_nombre, horarios: v.horarios });
+    }
+    return res;
+  }, [seleccion, mergedMap, cuatrimestre]);
+
+  // ¿Agregar esta comisión genera superposición? Las anuales se chequean en ambos cuatris.
+  function conflictaComision(mat: MMateria, com: MComision): boolean {
+    const cuatris: Idx[] = mat.anual ? [0, 1] : [cuatrimestre];
+    for (const ci of cuatris) {
+      const cand = com.c[ci];
+      if (!cand) continue;
+      const occ = ocupacion(ci).filter(o => o.codigo !== mat.codigo);
+      for (const o of occ) {
+        if (solapan(cand.horarios, o.horarios)) return true;
       }
     }
     return false;
   }
 
-  async function handleSelect(materia_codigo: string, cursada_id: number) {
-    const current = seleccion.get(materia_codigo);
-    setLoadingCodigo(materia_codigo);
+  function isComSelected(mat: MMateria, com: MComision): boolean {
+    const cur = seleccion.get(mat.codigo);
+    return !!cur && cur.comisionId === com.comision_id && (mat.anual || cur.cuatri === cuatrimestre);
+  }
+
+  async function toggleComision(mat: MMateria, com: MComision) {
+    const idx = cuatrimestre;
+    const yaEsta = isComSelected(mat, com);
+    setLoadingCodigo(mat.codigo);
     try {
-      if (current === cursada_id) {
-        await deseleccionarCursada(USUARIO_ID, materia_codigo);
-        setSeleccion(p => { const n = new Map(p); n.delete(materia_codigo); return n; });
+      if (yaEsta) {
+        await deseleccionarCursada(USUARIO_ID, mat.codigo);
+        setSeleccion(p => { const n = new Map(p); n.delete(mat.codigo); return n; });
       } else {
-        await seleccionarCursada(USUARIO_ID, materia_codigo, cursada_id);
-        setSeleccion(p => new Map(p).set(materia_codigo, cursada_id));
+        const cu = mat.anual ? (com.c[idx] ?? com.c[idx === 0 ? 1 : 0]) : com.c[idx];
+        if (!cu) return;
+        await seleccionarCursada(USUARIO_ID, mat.codigo, cu.cursada_id);
+        setSeleccion(p => new Map(p).set(mat.codigo, { comisionId: com.comision_id, cuatri: mat.anual ? null : idx }));
       }
     } catch (e) { console.error(e); }
     finally {
@@ -157,38 +280,65 @@ export function HorariosBuilder({ materias1, materias2 }: Props) {
     }
   }
 
-  const selectedMateria = materias.find(m => m.materia_codigo === selectedCodigo);
+  async function quitarMateria(codigo: string) {
+    setLoadingCodigo(codigo);
+    try {
+      await deseleccionarCursada(USUARIO_ID, codigo);
+      setSeleccion(p => { const n = new Map(p); n.delete(codigo); return n; });
+    } catch (e) { console.error(e); }
+    finally {
+      setLoadingCodigo(null);
+      startTransition(() => router.refresh());
+    }
+  }
+
+  function switchCuatrimestre(idx: Idx) {
+    setCuatrimestre(idx);
+    for (let i = 1; i <= 5; i++) {
+      if (mergedList.some(m => m.anio === i && m.en[idx])) { setAnioFiltro(i); return; }
+    }
+    setAnioFiltro("E");
+  }
+
+  // Drag & drop: soltar una comisión sobre la grilla la agrega
+  function onGridDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragInfo(null);
+    let payload: { codigo: string; comisionId: number } | null = null;
+    try { payload = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { /* noop */ }
+    if (!payload) return;
+    const mat = mergedMap.get(payload.codigo);
+    if (!mat) return;
+    const com = mat.comisiones.find(c => c.comision_id === payload!.comisionId);
+    if (!com) return;
+    if (conflictaComision(mat, com) || isComSelected(mat, com)) return;
+    void toggleComision(mat, com);
+  }
 
   return (
     <div className="flex flex-col" style={{ height: "calc(100vh - 4rem)" }}>
 
-      {/* ── Header ── */}
-      <div
-        className="flex items-center gap-4 px-5 shrink-0"
-        style={{ height: "52px", borderBottom: "1px solid rgba(141,145,155,0.09)" }}
-      >
-        <div className="flex-1 min-w-0">
-          <h1 className="text-[15px] font-black font-headline text-on-surface tracking-tight leading-none">
-            Armador de Horarios
-          </h1>
-          <p className="text-[11px] text-outline mt-0.5">
-            {materias.length} cursables · {seleccion.size} seleccionada{seleccion.size !== 1 ? "s" : ""}
-          </p>
-        </div>
+      {/* ── Header (compacto) ── */}
+      <div className="flex items-center gap-4 px-5 shrink-0" style={{ height: "46px", borderBottom: "1px solid rgba(141,145,155,0.1)" }}>
+        <h1 className="text-[15px] font-black font-headline text-on-surface tracking-tight leading-none shrink-0">
+          Armador de Horarios
+        </h1>
+        <span className="text-[11px] text-outline/70 shrink-0">
+          {seleccionActiva.length} materia{seleccionActiva.length !== 1 ? "s" : ""} en este cuatrimestre
+        </span>
 
-        {/* Cuatrimestre — switch instantáneo, sin navegación de página */}
-        <div
-          className="flex gap-0.5 p-0.5 rounded-xl shrink-0"
-          style={{ backgroundColor: "rgba(11,19,38,0.8)" }}
-        >
+        <div className="flex-1" />
+
+        <div className="flex gap-0.5 p-0.5 rounded-[10px] shrink-0" style={{ backgroundColor: "rgba(6,14,32,0.9)", border: "1px solid rgba(141,145,155,0.1)" }}>
           {["1° Cuatrimestre", "2° Cuatrimestre"].map((label, i) => (
             <button
               key={i}
-              onClick={() => switchCuatrimestre(i)}
-              className="px-4 py-1.5 rounded-[10px] text-xs font-semibold font-label transition-all"
+              onClick={() => switchCuatrimestre(i as Idx)}
+              className="hz-yearchip px-3.5 py-1.5 rounded-lg text-xs font-bold font-label"
               style={{
-                color: cuatrimestre === i ? "#adc6ff" : "rgba(141,145,155,0.7)",
-                backgroundColor: cuatrimestre === i ? "rgba(173,198,255,0.12)" : "transparent",
+                color: cuatrimestre === i ? "#0b1326" : "rgba(195,198,209,0.7)",
+                backgroundColor: cuatrimestre === i ? "#adc6ff" : "transparent",
+                boxShadow: cuatrimestre === i ? "0 2px 8px rgba(173,198,255,0.25)" : undefined,
               }}
             >
               {label}
@@ -200,33 +350,37 @@ export function HorariosBuilder({ materias1, materias2 }: Props) {
       {/* ── Layout principal ── */}
       <div className="flex flex-1 min-h-0">
 
-        {/* ── Panel izquierdo: filtro de año + lista de materias ── */}
-        <div
-          className="shrink-0 flex flex-col"
-          style={{ width: "216px", borderRight: "1px solid rgba(141,145,155,0.08)" }}
-        >
-          {/* Year tabs */}
-          <div className="flex flex-wrap gap-1 px-3 pt-3 pb-2 shrink-0">
-            {years.map(y => (
-              <button
-                key={y}
-                onClick={() => { setAnioFiltro(y); setSelectedCodigo(null); }}
-                className="px-2.5 py-[5px] rounded-lg text-[11px] font-bold font-label transition-colors"
-                style={{
-                  color: anioFiltro === y ? "#adc6ff" : "rgba(141,145,155,0.55)",
-                  backgroundColor: anioFiltro === y ? "rgba(173,198,255,0.1)" : "transparent",
-                }}
-              >
-                {y}° Año
-              </button>
-            ))}
+        {/* ── Panel izquierdo: tarjetas de materia ── */}
+        <div className="shrink-0 flex flex-col" style={{ width: "232px", borderRight: "1px solid rgba(141,145,155,0.1)" }}>
+          {/* Filtro por año — chips */}
+          <div className="flex flex-wrap gap-1.5 px-3 pt-2.5 pb-2.5 shrink-0">
+            {years.map(y => {
+              const on = anioFiltro === y;
+              return (
+                <button
+                  key={y}
+                  onClick={() => setAnioFiltro(y)}
+                  className="hz-yearchip rounded-lg text-[11px] font-bold font-label"
+                  style={{
+                    padding: "5px 11px",
+                    color: on ? "#0b1326" : "rgba(195,198,209,0.7)",
+                    background: on ? "#adc6ff" : "rgba(34,42,61,0.6)",
+                    border: `1px solid ${on ? "#adc6ff" : "rgba(141,145,155,0.18)"}`,
+                  }}
+                >
+                  {y}° Año
+                </button>
+              );
+            })}
             {tieneElectivas && (
               <button
-                onClick={() => { setAnioFiltro("E"); setSelectedCodigo(null); }}
-                className="px-2.5 py-[5px] rounded-lg text-[11px] font-bold font-label transition-colors"
+                onClick={() => setAnioFiltro("E")}
+                className="hz-yearchip rounded-lg text-[11px] font-bold font-label"
                 style={{
-                  color: anioFiltro === "E" ? "#ffb950" : "rgba(141,145,155,0.55)",
-                  backgroundColor: anioFiltro === "E" ? "rgba(255,185,80,0.1)" : "transparent",
+                  padding: "5px 11px",
+                  color: anioFiltro === "E" ? "#0b1326" : "rgba(195,198,209,0.7)",
+                  background: anioFiltro === "E" ? "#ffb950" : "rgba(34,42,61,0.6)",
+                  border: `1px solid ${anioFiltro === "E" ? "#ffb950" : "rgba(141,145,155,0.18)"}`,
                 }}
               >
                 Electivas
@@ -234,169 +388,141 @@ export function HorariosBuilder({ materias1, materias2 }: Props) {
             )}
           </div>
 
-          {/* Divisor */}
-          <div style={{ height: "1px", backgroundColor: "rgba(141,145,155,0.07)", marginLeft: "12px", marginRight: "12px" }} />
+          <p className="text-[9px] text-outline/45 uppercase tracking-[0.15em] px-3.5 pb-1.5 font-label select-none shrink-0">
+            Materias disponibles
+          </p>
 
-          {/* Materia list */}
-          <div className="flex-1 overflow-y-auto py-1.5">
+          {/* Tarjetas (compactas) */}
+          <div className="flex-1 overflow-y-auto px-2.5 pb-3 space-y-2">
             {materiasFiltradas.length === 0 ? (
               <p className="text-xs text-outline/40 text-center px-4 py-10 leading-relaxed">
                 Sin materias cursables para este año.
               </p>
             ) : (
               materiasFiltradas.map(mat => {
-                const isSel = seleccion.has(mat.materia_codigo);
-                const isActive = selectedCodigo === mat.materia_codigo;
-                const color = colorMap.get(mat.materia_codigo);
+                const color = colorCard(mat.codigo);
+                const comisVista = mat.comisiones.filter(c => c.c[cuatrimestre]);
                 return (
-                  <button
-                    key={mat.materia_codigo}
-                    onClick={() => setSelectedCodigo(mat.materia_codigo)}
-                    style={{ display: "flex", width: "100%", textAlign: "left", position: "relative" }}
-                    className="items-center gap-2 px-3 py-[7px] transition-colors"
+                  <div
+                    key={mat.codigo}
+                    className="hz-card relative"
+                    style={{
+                      ["--c" as string]: color.rgb,
+                      borderRadius: "12px",
+                      padding: "9px 10px 9px 12px",
+                      background: `rgba(${color.rgb},0.05)`,
+                      border: `1px solid rgba(${color.rgb},0.16)`,
+                    }}
                   >
-                    {/* Active bar */}
-                    {isActive && (
-                      <span style={{
-                        position: "absolute", left: 0, top: "6px", bottom: "6px",
-                        width: "2px", borderRadius: "0 2px 2px 0",
-                        backgroundColor: color?.text ?? "#adc6ff",
-                      }} />
-                    )}
-                    {/* Hover/active bg */}
-                    <span style={{
-                      position: "absolute", inset: 0,
-                      backgroundColor: isActive
-                        ? `rgba(${color?.rgb ?? "173,198,255"},0.08)`
-                        : undefined,
-                      borderRadius: "0 8px 8px 0",
-                    }} />
+                    {/* Barra de acento lateral (identidad de color) */}
+                    <span style={{ position: "absolute", left: 0, top: "9px", bottom: "9px", width: "3px", borderRadius: "0 3px 3px 0", background: `rgb(${color.rgb})`, opacity: 0.85 }} />
 
-                    {/* Dot */}
-                    <span style={{
-                      display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", flexShrink: 0, position: "relative",
-                      backgroundColor: isSel ? (color?.text ?? "#adc6ff") : isActive ? "rgba(141,145,155,0.5)" : "rgba(67,71,80,0.6)",
-                    }} />
-
-                    <span style={{
-                      position: "relative", fontSize: "11px", lineHeight: "1.45", flex: 1,
-                      color: isActive ? "#dae2fd" : isSel ? "rgba(218,226,253,0.75)" : "rgba(141,145,155,0.7)",
-                    }}>
-                      {mat.materia_nombre}
-                    </span>
-
-                    {isSel && (
-                      <span
-                        className="material-symbols-outlined"
-                        style={{ position: "relative", fontSize: "12px", color: color?.text, fontVariationSettings: "'FILL' 1", flexShrink: 0 }}
+                    {/* Encabezado */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        style={{
+                          width: "28px", height: "28px", borderRadius: "8px", flexShrink: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          background: `rgba(${color.rgb},0.16)`,
+                          border: `1px solid rgba(${color.rgb},0.25)`,
+                        }}
                       >
-                        check_circle
-                      </span>
+                        <span className="material-symbols-outlined" style={{ fontSize: "16px", color: color.text }}>
+                          {materiaIcon(mat.nombre)}
+                        </span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p
+                          className="font-headline"
+                          style={{
+                            fontSize: "12px", fontWeight: 800, lineHeight: 1.15, color: "#eaf0ff",
+                            letterSpacing: "-0.01em",
+                            overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                          }}
+                        >
+                          {mat.nombre}
+                        </p>
+                        <p className="font-label" style={{ fontSize: "9.5px", fontWeight: 500, color: "rgba(141,145,155,0.8)", marginTop: "1px" }}>
+                          {comisVista.length} comisión{comisVista.length !== 1 ? "es" : ""}
+                          {mat.anual ? " · anual" : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Chips de comisión */}
+                    {comisVista.length === 0 ? (
+                      <p style={{ fontSize: "10px", color: "rgba(141,145,155,0.35)" }}>
+                        Sin comisiones este cuatrimestre.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {comisVista.map(com => {
+                          const conflict = conflictaComision(mat, com);
+                          const loading = loadingCodigo === mat.codigo;
+                          const cu = com.c[cuatrimestre]!;
+                          const resumen = cu.horarios
+                            .map(h => `${normDia(h.dia ?? "").slice(0, 3)} ${h.hora_inicio?.slice(0, 5) ?? ""}-${h.hora_fin?.slice(0, 5) ?? ""}`)
+                            .join("\n");
+                          return (
+                            <button
+                              key={com.comision_id}
+                              draggable={!conflict && !loading}
+                              onDragStart={e => {
+                                setDragInfo({ codigo: mat.codigo, comisionId: com.comision_id });
+                                e.dataTransfer.effectAllowed = "copy";
+                                e.dataTransfer.setData("text/plain", JSON.stringify({ codigo: mat.codigo, comisionId: com.comision_id }));
+                              }}
+                              onDragEnd={() => setDragInfo(null)}
+                              onClick={() => !loading && !conflict && toggleComision(mat, com)}
+                              disabled={loading || conflict}
+                              title={[com.docente ? `Prof: ${com.docente}` : null, resumen].filter(Boolean).join("\n") || undefined}
+                              className="hz-chip font-label"
+                              style={{
+                                ["--c" as string]: color.rgb,
+                                padding: "3.5px 9px",
+                                borderRadius: "7px",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                letterSpacing: "0.01em",
+                                border: `1px solid ${conflict ? "rgba(141,145,155,0.1)" : "rgba(141,145,155,0.22)"}`,
+                                background: conflict ? "rgba(11,19,38,0.4)" : "rgba(34,42,61,0.8)",
+                                color: conflict ? "rgba(141,145,155,0.3)" : "#dce0ea",
+                                cursor: conflict ? "not-allowed" : "grab",
+                                textDecoration: conflict ? "line-through" : undefined,
+                              }}
+                            >
+                              {com.comision_nombre ?? `#${com.comision_id}`}
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })
             )}
           </div>
+
+          <p className="text-[10px] text-outline/35 text-center px-4 py-2 leading-relaxed shrink-0 border-t border-outline-variant/10">
+            Arrastrá o hacé clic en una comisión
+          </p>
         </div>
 
-        {/* ── Panel derecho: picker + grilla ── */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-          {/* Comision picker */}
-          <div
-            className="shrink-0 overflow-y-auto"
-            style={{
-              maxHeight: selectedMateria ? "210px" : "0px",
-              transition: "max-height 0.2s ease",
-              borderBottom: selectedMateria ? "1px solid rgba(141,145,155,0.08)" : "none",
-              backgroundColor: "rgba(17,25,46,0.5)",
-            }}
-          >
-            {selectedMateria && (
-              <div className="px-5 pt-3.5 pb-3.5">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span style={{
-                    display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0,
-                    backgroundColor: colorMap.get(selectedMateria.materia_codigo)?.text ?? "#adc6ff",
-                  }} />
-                  <span className="text-sm font-bold text-on-surface font-headline flex-1 truncate">
-                    {selectedMateria.materia_nombre}
-                  </span>
-                  <span className="text-[11px] text-outline shrink-0">
-                    {selectedMateria.comisiones.length} comisión{selectedMateria.comisiones.length !== 1 ? "es" : ""}
-                  </span>
-                  {seleccion.has(selectedMateria.materia_codigo) && (
-                    <button
-                      onClick={() => handleSelect(selectedMateria.materia_codigo, seleccion.get(selectedMateria.materia_codigo)!)}
-                      disabled={loadingCodigo === selectedMateria.materia_codigo}
-                      style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "11px", color: "rgba(141,145,155,0.6)", flexShrink: 0 }}
-                      className="hover:text-error transition-colors"
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: "12px" }}>close</span>
-                      Quitar
-                    </button>
-                  )}
-                </div>
-
-                {selectedMateria.comisiones.length === 0 ? (
-                  <p className="text-xs text-outline/40">Sin comisiones disponibles para este cuatrimestre.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedMateria.comisiones.map(c => {
-                      const isSel = seleccion.get(selectedMateria.materia_codigo) === c.cursada_id;
-                      const conflict = !isSel && conflicta(c, selectedMateria.materia_codigo);
-                      const loading = loadingCodigo === selectedMateria.materia_codigo;
-                      const resumen = c.horarios.slice(0, 3)
-                        .map(h => `${normDia(h.dia ?? "").slice(0, 3)} ${h.hora_inicio?.slice(0, 5) ?? ""}`)
-                        .join(" · ");
-
-                      return (
-                        <button
-                          key={c.cursada_id}
-                          onClick={() => !loading && !conflict && handleSelect(selectedMateria.materia_codigo, c.cursada_id)}
-                          disabled={loading || conflict}
-                          title={[c.docente ? `Prof: ${c.docente}` : null, resumen].filter(Boolean).join("\n") || undefined}
-                          className="flex flex-col transition-all"
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: "12px",
-                            border: `1px solid ${isSel ? "rgba(125,255,162,0.35)" : conflict ? "rgba(141,145,155,0.1)" : "rgba(141,145,155,0.18)"}`,
-                            backgroundColor: isSel
-                              ? "rgba(125,255,162,0.09)"
-                              : conflict ? "rgba(11,19,38,0.5)" : "rgba(34,42,61,0.6)",
-                            color: isSel ? "#7dffa2" : conflict ? "rgba(141,145,155,0.28)" : "#dae2fd",
-                            boxShadow: isSel ? "0 0 14px rgba(125,255,162,0.08)" : undefined,
-                            cursor: conflict ? "not-allowed" : "pointer",
-                          }}
-                        >
-                          <span style={{ fontSize: "12px", fontWeight: 600 }}>
-                            {c.comision_nombre ?? `#${c.comision_id}`}
-                          </span>
-                          <span style={{
-                            fontSize: "10px", marginTop: "3px", fontWeight: 400,
-                            color: isSel ? "rgba(125,255,162,0.5)" : conflict ? "rgba(141,145,155,0.2)" : "rgba(141,145,155,0.55)",
-                          }}>
-                            {resumen || "Sin horario"}
-                          </span>
-                          {conflict && (
-                            <span style={{ fontSize: "9px", color: "rgba(255,100,100,0.45)", marginTop: "2px" }}>
-                              superposición
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Grilla semanal — siempre visible, llena el espacio restante */}
-          <div className="flex-1 min-h-0" style={{ overflowX: "auto", overflowY: "hidden" }}>
-            <ScheduleGrid seleccionados={seleccionActiva} colorMap={colorMap} />
-          </div>
+        {/* ── Panel derecho: calendario (drop zone) ── */}
+        <div
+          className="flex-1 min-w-0"
+          style={{
+            overflowX: "auto",
+            overflowY: "hidden",
+            outline: dragInfo ? "2px dashed rgba(125,255,162,0.4)" : "none",
+            outlineOffset: "-6px",
+            transition: "outline-color 0.15s",
+          }}
+          onDragOver={e => { if (dragInfo) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }}
+          onDrop={onGridDrop}
+        >
+          <ScheduleGrid seleccionados={seleccionActiva} colorMap={colorAsignado} dragging={!!dragInfo} onRemove={quitarMateria} />
         </div>
       </div>
     </div>
@@ -404,7 +530,7 @@ export function HorariosBuilder({ materias1, materias2 }: Props) {
 }
 
 // ---------------------------------------------------------------------------
-// ScheduleGrid — siempre muestra Lun-Vie con módulos UTN en el costado
+// ScheduleGrid — ventana vertical dinámica + columnas flexibles
 // ---------------------------------------------------------------------------
 
 type SelItem = { codigo: string; nombre: string; comision_nombre: string | null; horarios: HorarioOut[] };
@@ -412,15 +538,17 @@ type SelItem = { codigo: string; nombre: string; comision_nombre: string | null;
 function ScheduleGrid({
   seleccionados,
   colorMap,
+  dragging,
+  onRemove,
 }: {
   seleccionados: SelItem[];
   colorMap: Map<string, Color>;
+  dragging: boolean;
+  onRemove: (codigo: string) => void;
 }) {
   const tieneSab = seleccionados.some(s => s.horarios.some(h => h.dia && normDia(h.dia) === "Sabado"));
   const dias = tieneSab ? [...DIAS, "Sabado"] : DIAS;
 
-  // Ventana vertical DINÁMICA: se ajusta al rango real de las clases elegidas.
-  // Esto elimina el espacio muerto — la grilla siempre se ve "llena".
   let minStart = Infinity, maxEnd = -Infinity;
   for (const sel of seleccionados) {
     for (const h of sel.horarios) {
@@ -430,174 +558,136 @@ function ScheduleGrid({
     }
   }
   const vacio = !isFinite(minStart) || !isFinite(maxEnd) || minStart >= maxEnd;
-  // Vista por defecto (sin selección): turno mañana 07:15–13:00
   let startH = vacio ? 7.0 : minStart - 0.4;
   let endH = vacio ? 13.5 : maxEnd + 0.4;
   startH = Math.max(6.75, startH);
   endH = Math.min(24.2, endH);
-  if (endH - startH < 5) endH = Math.min(24.2, startH + 5); // alto mínimo razonable
+  if (endH - startH < 5) endH = Math.min(24.2, startH + 5);
   const span = endH - startH;
 
   const pct = (v: number) => ((v - startH) / span) * 100;
-  const toPct = (t: string | null) => {
-    const v = parseHF(t);
-    return v === null ? null : pct(v);
-  };
-
-  // Sólo los módulos dentro de la ventana visible
-  const modulosVis = UTN_MODULOS.filter(t => {
-    const v = moduloH(t);
-    return v >= startH - 0.05 && v <= endH + 0.05;
-  });
-
-  // Turnos para el tinte de fondo, recortados a la ventana
-  const turnos = [
-    { from: 7.25, to: 13.0, rgb: "173,198,255" },
-    { from: 13.0, to: 18.4, rgb: "255,185,80" },
-    { from: 18.4, to: 24.2, rgb: "125,255,162" },
-  ];
+  const toPct = (t: string | null) => { const v = parseHF(t); return v === null ? null : pct(v); };
+  const modulosVis = UTN_MODULOS.filter(t => { const v = moduloH(t); return v >= startH - 0.05 && v <= endH + 0.05; });
 
   return (
-    <div
-      style={{
-        height: "100%",
-        minWidth: `${LABEL_W + dias.length * 96}px`,
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-      }}
-    >
-      {/* Encabezado de días */}
+    <div style={{ height: "100%", minWidth: `${LABEL_W + dias.length * 104}px`, display: "flex", flexDirection: "column", position: "relative" }}>
+      {/* Encabezado de días — barra sólida tipo Google/Cron */}
       <div
         className="flex shrink-0"
-        style={{ paddingLeft: `${LABEL_W}px`, borderBottom: "1px solid rgba(141,145,155,0.08)" }}
+        style={{
+          paddingLeft: `${LABEL_W}px`,
+          background: "rgba(8,14,30,0.75)",
+          borderBottom: "1px solid rgba(141,145,155,0.16)",
+        }}
       >
-        {dias.map(dia => (
+        {dias.map((dia, i) => (
           <div
             key={dia}
-            className="text-center font-bold font-label uppercase tracking-wider"
-            style={{ flex: 1, fontSize: "10px", color: "rgba(141,145,155,0.55)", padding: "11px 0" }}
+            className="text-center font-headline uppercase"
+            style={{
+              flex: 1,
+              fontSize: "11px", fontWeight: 800, letterSpacing: "0.12em",
+              color: "rgba(218,226,253,0.95)",
+              padding: "14px 0",
+              borderLeft: i === 0 ? "none" : "1px solid rgba(141,145,155,0.1)",
+            }}
           >
             {DIA_LABEL[dia] ?? dia.slice(0, 3).toUpperCase()}
           </div>
         ))}
       </div>
 
-      {/* Cuerpo — llena el alto restante */}
+      {/* Cuerpo */}
       <div className="flex flex-1" style={{ minHeight: 0 }}>
-
-        {/* Columna de etiquetas de módulo */}
-        <div className="shrink-0" style={{ width: `${LABEL_W}px`, position: "relative" }}>
+        {/* Etiquetas de módulo (horas) — más contraste y peso */}
+        <div className="shrink-0" style={{ width: `${LABEL_W}px`, position: "relative", borderRight: "1px solid rgba(141,145,155,0.1)" }}>
           {modulosVis.map(t => (
-            <div
-              key={t}
-              style={{
-                position: "absolute",
-                top: `${pct(moduloH(t))}%`,
-                right: "8px",
-                transform: "translateY(-50%)",
-                fontSize: "9px",
-                color: "rgba(141,145,155,0.4)",
-                fontFamily: "var(--font-inter), ui-sans-serif",
-                letterSpacing: "0.02em",
-                whiteSpace: "nowrap",
-              }}
-            >
+            <div key={t} className="font-label" style={{ position: "absolute", top: `${pct(moduloH(t))}%`, right: "10px", transform: "translateY(-50%)", fontSize: "11px", fontWeight: 700, color: "rgba(195,198,209,0.78)", letterSpacing: "0.01em", whiteSpace: "nowrap" }}>
               {t}
             </div>
           ))}
         </div>
 
-        {/* Área de columnas */}
+        {/* Columnas */}
         <div className="relative flex" style={{ flex: 1 }}>
-          {/* Tintes de turno */}
-          {turnos.map(({ from, to, rgb }) => {
-            const top = Math.max(0, pct(from));
-            const bot = Math.min(100, pct(to));
-            if (bot <= 0 || top >= 100 || bot <= top) return null;
-            return (
-              <div
-                key={rgb}
-                style={{
-                  position: "absolute", left: 0, right: 0,
-                  top: `${top}%`, height: `${bot - top}%`,
-                  background: `rgba(${rgb},0.022)`,
-                  pointerEvents: "none",
-                }}
-              />
-            );
-          })}
-
-          {/* Líneas horizontales en los módulos */}
+          {/* Líneas horizontales en los módulos — un poco más visibles para seguir la fila */}
           {modulosVis.map(t => (
-            <div
-              key={t}
-              style={{
-                position: "absolute", left: 0, right: 0,
-                top: `${pct(moduloH(t))}%`,
-                borderTop: "1px solid rgba(141,145,155,0.06)",
-                pointerEvents: "none",
-              }}
-            />
+            <div key={t} style={{ position: "absolute", left: 0, right: 0, top: `${pct(moduloH(t))}%`, borderTop: "1px solid rgba(141,145,155,0.1)", pointerEvents: "none" }} />
           ))}
 
-          {/* Una columna flexible por día */}
-          {dias.map(dia => (
+          {dias.map((dia, i) => (
             <div
               key={dia}
-              className="relative"
-              style={{ flex: 1, borderRight: "1px solid rgba(141,145,155,0.045)" }}
+              className="relative hz-col"
+              style={{
+                flex: 1,
+                // Fondo alternado muy sutil + separadores de columna definidos
+                background: i % 2 === 1 ? "rgba(141,145,155,0.025)" : "transparent",
+                borderLeft: i === 0 ? "none" : "1px solid rgba(141,145,155,0.09)",
+              }}
             >
               {seleccionados.map(sel => {
                 const color = colorMap.get(sel.codigo) ?? PALETTE[0];
                 return sel.horarios
                   .filter(h => h.dia && normDia(h.dia) === dia)
                   .map((h, idx) => {
-                    const top = toPct(h.hora_inicio);
-                    const bot = toPct(h.hora_fin);
+                    const top = toPct(h.hora_inicio), bot = toPct(h.hora_fin);
                     if (top === null || bot === null) return null;
                     const height = Math.max(bot - top, 2.2);
-                    const compact = height < 7; // bloque chico → menos info
-
+                    const showCom = height >= 6.5;   // nivel 2: comisión
+                    const showHora = height >= 9.5;  // nivel 3: horario
+                    const tiny = height < 4.5;
                     return (
                       <div
                         key={`${sel.codigo}-${idx}`}
-                        title={`${sel.nombre} · ${sel.comision_nombre ?? ""}\n${h.hora_inicio?.slice(0, 5) ?? ""}–${h.hora_fin?.slice(0, 5) ?? ""}${h.aula ? ` · ${h.aula}` : ""}`}
+                        onClick={() => onRemove(sel.codigo)}
+                        title={`${sel.nombre} · ${sel.comision_nombre ?? ""}\n${h.hora_inicio?.slice(0, 5) ?? ""}–${h.hora_fin?.slice(0, 5) ?? ""}${h.aula ? ` · ${h.aula}` : ""}\n(clic para quitar)`}
+                        className="group hz-event"
                         style={{
-                          position: "absolute",
-                          top: `${top}%`,
-                          height: `${height}%`,
-                          left: "5px", right: "5px",
-                          borderRadius: "10px",
-                          overflow: "hidden",
-                          background: `linear-gradient(160deg, rgba(${color.rgb},0.22), rgba(${color.rgb},0.10))`,
+                          ["--c" as string]: color.rgb,
+                          position: "absolute", top: `${top}%`, height: `${height}%`, left: "4px", right: "4px",
+                          borderRadius: "8px", overflow: "hidden", cursor: "pointer",
+                          // Evento SÓLIDO estilo Linear: base opaca + tinte de color suave, borde discreto.
+                          background: `linear-gradient(0deg, rgba(${color.rgb},0.14), rgba(${color.rgb},0.14)), #141d33`,
+                          border: `1px solid rgba(${color.rgb},0.26)`,
                           borderLeft: `3px solid rgb(${color.rgb})`,
-                          boxShadow: `0 2px 12px rgba(${color.rgb},0.10), inset 0 0 0 1px rgba(${color.rgb},0.18)`,
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: compact ? "center" : "flex-start",
-                          padding: compact ? "0 8px" : "7px 9px",
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
+                          display: "flex", flexDirection: "column",
+                          justifyContent: tiny ? "center" : "flex-start",
+                          padding: tiny ? "0 8px" : "6px 8px",
                         }}
                       >
-                        <p style={{
-                          fontSize: "11px", fontWeight: 700, lineHeight: 1.25,
-                          color: color.text,
-                          overflow: "hidden", textOverflow: "ellipsis",
-                          whiteSpace: compact ? "nowrap" : "normal",
-                          display: "-webkit-box",
-                          WebkitLineClamp: compact ? 1 : 2,
-                          WebkitBoxOrient: "vertical",
-                        }}>
-                          {sel.nombre}
-                        </p>
-                        {!compact && (
-                          <p style={{
-                            fontSize: "10px", lineHeight: 1.3, marginTop: "auto", paddingTop: "4px",
-                            color: "rgba(218,226,253,0.5)",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          }}>
-                            {h.hora_inicio?.slice(0, 5) ?? ""}–{h.hora_fin?.slice(0, 5) ?? ""}
-                            {sel.comision_nombre ? ` · ${sel.comision_nombre}` : ""}
+                        {/* Botón quitar (hover) */}
+                        <span
+                          className="material-symbols-outlined opacity-0 group-hover:opacity-100"
+                          style={{ position: "absolute", top: "3px", right: "3px", fontSize: "14px", color: color.text, transition: "opacity 0.15s", background: "rgba(8,14,30,0.7)", borderRadius: "6px", padding: "1px" }}
+                        >
+                          close
+                        </span>
+
+                        {/* Nivel 1 — nombre + ícono (domina visualmente) */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                          {!tiny && (
+                            <span className="material-symbols-outlined shrink-0" style={{ fontSize: "15px", color: color.text }}>
+                              {materiaIcon(sel.nombre)}
+                            </span>
+                          )}
+                          <p className="font-headline" style={{ fontSize: "12px", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em", color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: tiny ? "nowrap" : "normal", display: "-webkit-box", WebkitLineClamp: showHora ? 2 : 1, WebkitBoxOrient: "vertical", flex: 1, minWidth: 0 }}>
+                            {sel.nombre}
+                          </p>
+                        </div>
+
+                        {/* Nivel 2 — comisión */}
+                        {showCom && sel.comision_nombre && (
+                          <p className="font-label" style={{ fontSize: "10.5px", fontWeight: 700, lineHeight: 1.2, marginTop: "4px", color: "rgba(234,240,255,0.9)", letterSpacing: "0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {sel.comision_nombre}
+                          </p>
+                        )}
+
+                        {/* Nivel 3 — horario (presente pero discreto) */}
+                        {showHora && (
+                          <p className="font-label" style={{ fontSize: "9.5px", fontWeight: 500, lineHeight: 1.2, marginTop: "auto", paddingTop: "4px", color: "rgba(195,198,209,0.55)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {h.hora_inicio?.slice(0, 5) ?? ""} – {h.hora_fin?.slice(0, 5) ?? ""}
                           </p>
                         )}
                       </div>
@@ -609,24 +699,14 @@ function ScheduleGrid({
         </div>
       </div>
 
-      {/* Empty state */}
-      {seleccionados.length === 0 && (
-        <div
-          style={{
-            position: "absolute", inset: 0,
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            gap: "10px", pointerEvents: "none",
-          }}
-        >
-          <span
-            className="material-symbols-outlined"
-            style={{ fontSize: "40px", color: "rgba(141,145,155,0.14)", fontVariationSettings: "'FILL' 0" }}
-          >
-            calendar_view_week
+      {/* Empty / drop hint */}
+      {(seleccionados.length === 0 || dragging) && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", pointerEvents: "none" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: "40px", color: dragging ? "rgba(125,255,162,0.4)" : "rgba(141,145,155,0.14)", fontVariationSettings: "'FILL' 0" }}>
+            {dragging ? "add_circle" : "calendar_view_week"}
           </span>
-          <p style={{ fontSize: "12px", color: "rgba(141,145,155,0.3)" }}>
-            Elegí una materia y sus comisiones para armar tu cursada
+          <p style={{ fontSize: "12px", color: dragging ? "rgba(125,255,162,0.6)" : "rgba(141,145,155,0.3)" }}>
+            {dragging ? "Soltá para agregar a tu cursada" : "Elegí una materia y arrastrá sus comisiones acá"}
           </p>
         </div>
       )}

@@ -161,6 +161,7 @@ export interface MateriaCursableOut {
   materia_codigo: string;
   materia_nombre: string;
   anio_carrera: number | null;
+  es_anual: boolean;
   cursada_seleccionada_id: number | null;
   comisiones: ComisionCursadaOut[];
 }

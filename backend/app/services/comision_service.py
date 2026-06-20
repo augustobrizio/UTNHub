@@ -100,6 +100,7 @@ def materias_cursables_con_comisiones(
                 materia_codigo=codigo,
                 materia_nombre=materia.nombre,
                 anio_carrera=materia.anio_carrera,
+                es_anual=(materia.cuatrimestre or "").strip().lower() == "anual",
                 cursada_seleccionada_id=selecciones.get(codigo),
                 comisiones=comisiones_out,
             )

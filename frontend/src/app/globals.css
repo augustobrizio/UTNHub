@@ -95,3 +95,54 @@
     -webkit-backdrop-filter: blur(14px);
   }
 }
+
+/* =====================================================================
+ * Armador de horarios — microinteracciones (Linear / Cron style)
+ * La variable --c (rgb de la materia) se setea inline en cada elemento.
+ * ===================================================================*/
+
+/* Evento del calendario — estilo Linear: sólido, borde discreto, sin glow */
+.hz-event {
+  transition: transform 0.16s ease-out, box-shadow 0.16s ease-out, border-color 0.16s ease-out;
+}
+.hz-event:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--c), 0.5) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+  z-index: 6;
+}
+
+/* Columna del día — resaltado de orientación al pasar el mouse */
+.hz-col {
+  transition: background 0.16s ease-out;
+}
+.hz-col:hover {
+  background: rgba(255, 255, 255, 0.022) !important;
+}
+
+/* Tarjeta de materia disponible */
+.hz-card {
+  transition: transform 0.18s ease-out, background 0.18s ease-out, border-color 0.18s ease-out, box-shadow 0.18s ease-out;
+}
+.hz-card:hover {
+  transform: translateY(-1px);
+  background: rgba(var(--c), 0.08) !important;
+  border-color: rgba(var(--c), 0.3) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+/* Chip de comisión */
+.hz-chip {
+  transition: background 0.16s ease-out, border-color 0.16s ease-out, color 0.16s ease-out, transform 0.16s ease-out;
+}
+.hz-chip:not(:disabled):hover {
+  background: rgba(var(--c), 0.16) !important;
+  border-color: rgba(var(--c), 0.45) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+/* Chip de filtro de año */
+.hz-yearchip {
+  transition: background 0.16s ease-out, color 0.16s ease-out, border-color 0.16s ease-out;
+}
