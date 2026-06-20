@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CorrelativaEdge, EstadoMateria, MateriaNodo } from "@/lib/types";
+import { materiaIcon } from "@/lib/materiaIcon";
 import { layoutGrafo, NODE_W, NODE_H, LABEL_Y } from "./layout";
 
 interface Props {
@@ -378,10 +379,13 @@ function NodoCard({
           transform: verNotas ? "rotateY(180deg)" : "rotateY(0deg)",
         }}
       >
-        {/* ── FRENTE: solo nombre + icono de estado ─────────────────── */}
+        {/* ── FRENTE: ícono de materia + nombre + icono de estado ────── */}
         <div className={frontCls} style={{ backfaceVisibility: "hidden" }}>
-          {/* Icono de estado — top right */}
-          <div className="flex justify-end mb-1">
+          {/* Fila superior: ícono de materia (izq) + icono de estado (der) */}
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="material-symbols-outlined text-[16px] text-on-surface-variant/60">
+              {materiaIcon(nodo.nombre)}
+            </span>
             <span
               className={`material-symbols-outlined text-[16px] ${style.iconColor} ${
                 nodo.estado === "aprobado" ? "material-symbols-filled" : ""

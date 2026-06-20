@@ -11,6 +11,7 @@ import type {
   TipoMateria,
 } from "@/lib/types";
 import { registrarEstado, eliminarEstado } from "@/lib/api";
+import { materiaIcon } from "@/lib/materiaIcon";
 import { GrafoCanvas } from "./GrafoCanvas";
 import { HeaderStats } from "./HeaderStats";
 import { Filtros } from "./Filtros";
@@ -601,11 +602,20 @@ function MateriaModal({
             </div>
           </div>
 
-          {/* Fila 2: título */}
-          <h2 className="text-xl font-headline font-extrabold text-on-surface leading-tight">
-            {nodo.nombre}
-          </h2>
-          <p className="text-[10px] text-outline/60 font-label mt-1">{nodo.codigo}</p>
+          {/* Fila 2: ícono + título */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[22px] text-primary">
+                {materiaIcon(nodo.nombre)}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-xl font-headline font-extrabold text-on-surface leading-tight">
+                {nodo.nombre}
+              </h2>
+              <p className="text-[10px] text-outline/60 font-label mt-0.5">{nodo.codigo}</p>
+            </div>
+          </div>
         </div>
 
         {/* Cuerpo scrolleable */}

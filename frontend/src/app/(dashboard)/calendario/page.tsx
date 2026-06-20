@@ -11,35 +11,47 @@ const TIPOS: Array<{ value: TipoEventoCalendario | "todos"; label: string; icon:
   { value: "evento", label: "Eventos", icon: "campaign" },
 ];
 
+// Colores alineados con la paleta de la agenda de Horarios (mismos tonos).
 const TIPO_STYLE: Record<
   TipoEventoCalendario,
-  { icon: string; dot: string; chip: string; label: string }
+  { icon: string; rgb: string; text: string; label: string }
 > = {
   examen: {
     icon: "event_upcoming",
-    dot: "bg-error",
-    chip: "bg-error/12 text-error border-error/25",
+    rgb: "255,130,130",
+    text: "#ffb0b0",
     label: "Examen",
   },
   inscripcion: {
     icon: "edit_calendar",
-    dot: "bg-primary",
-    chip: "bg-primary/12 text-primary border-primary/25",
+    rgb: "138,180,255",
+    text: "#bcd4ff",
     label: "Inscripcion",
   },
   feriado: {
     icon: "beach_access",
-    dot: "bg-tertiary",
-    chip: "bg-tertiary/12 text-tertiary border-tertiary/25",
+    rgb: "255,185,80",
+    text: "#ffce8f",
     label: "Feriado",
   },
   evento: {
     icon: "campaign",
-    dot: "bg-secondary",
-    chip: "bg-secondary/12 text-secondary border-secondary/25",
+    rgb: "125,255,162",
+    text: "#9cffc2",
     label: "Evento",
   },
 };
+
+/** Estilo sólido tipo "evento de agenda" para un tipo de calendario. */
+function eventoChipStyle(tipo: TipoEventoCalendario) {
+  const { rgb } = TIPO_STYLE[tipo];
+  return {
+    background: `linear-gradient(0deg, rgba(${rgb},0.14), rgba(${rgb},0.14)), #141d33`,
+    border: `1px solid rgba(${rgb},0.26)`,
+    borderLeft: `3px solid rgb(${rgb})`,
+    color: TIPO_STYLE[tipo].text,
+  };
+}
 
 type Search = {
   tipo?: string;
@@ -87,43 +99,36 @@ export default async function CalendarioPage({
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-blueprint">
-      <div className="p-6 md:p-8 max-w-[1500px] mx-auto space-y-6">
-        <header className="flex flex-col gap-5">
-          <div className="space-y-5">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] font-bold text-primary font-label">
-                Calendario academico
-              </p>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight font-headline text-on-surface mt-2">
-                {capitalizarMes(mesActivo)}
-              </h1>
-              <p className="text-on-surface-variant mt-2">
-                Ingenieria en Sistemas - UTN FRRO
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <IconLink
-                href={hrefCalendario({ mes: prevMes, tipo: tipoParam })}
-                icon="chevron_left"
-                label="Anterior"
-              />
-              <IconLink
-                href={hrefCalendario({ mes: inicioMes(new Date()), tipo: tipoParam })}
-                icon="today"
-                label="Hoy"
-              />
-              <IconLink
-                href={hrefCalendario({ mes: nextMes, tipo: tipoParam })}
-                icon="chevron_right"
-                label="Siguiente"
-              />
-            </div>
+      <div className="p-5 md:p-6 max-w-[1500px] mx-auto space-y-5">
+        {/* Header compacto — alineado con la agenda */}
+        <header className="flex items-center gap-4 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-outline/60 font-label">
+              Calendario académico · ISI
+            </p>
+            <h1 className="text-2xl font-black tracking-tight font-headline text-on-surface leading-none mt-1">
+              {capitalizarMes(mesActivo)}
+            </h1>
           </div>
 
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <NavBtn href={hrefCalendario({ mes: prevMes, tipo: tipoParam })} icon="chevron_left" label="Mes anterior" />
+            <Link
+              href={hrefCalendario({ mes: inicioMes(new Date()), tipo: tipoParam })}
+              className="hz-yearchip h-9 px-3.5 rounded-lg flex items-center gap-1.5 text-xs font-bold font-label text-on-surface-variant hover:text-on-surface"
+              style={{ background: "rgba(34,42,61,0.6)", border: "1px solid rgba(141,145,155,0.18)" }}
+            >
+              <span className="material-symbols-outlined text-[16px]">today</span>
+              Hoy
+            </Link>
+            <NavBtn href={hrefCalendario({ mes: nextMes, tipo: tipoParam })} icon="chevron_right" label="Mes siguiente" />
+          </div>
         </header>
 
-        <nav className="flex flex-wrap gap-2">
+        {/* Chips de filtro — mismo estilo que los selectores de la agenda */}
+        <nav className="flex flex-wrap gap-1.5">
           {TIPOS.map((tipo) => {
             const activo = (tipoParam ?? "todos") === tipo.value;
             const href = hrefCalendario({
@@ -134,13 +139,14 @@ export default async function CalendarioPage({
               <Link
                 key={tipo.value}
                 href={href}
-                className={`h-10 px-3 rounded-xl border flex items-center gap-2 text-xs font-bold uppercase tracking-widest font-label transition-colors ${
-                  activo
-                    ? "bg-primary text-on-primary border-primary shadow-[0_0_20px_rgba(173,198,255,0.12)]"
-                    : "bg-surface-container/80 border-outline-variant/15 text-on-surface-variant hover:text-on-surface hover:border-outline-variant/30"
-                }`}
+                className="hz-yearchip h-8 px-3 rounded-lg flex items-center gap-1.5 text-[11px] font-bold font-label"
+                style={{
+                  color: activo ? "#0b1326" : "rgba(195,198,209,0.72)",
+                  background: activo ? "#adc6ff" : "rgba(34,42,61,0.6)",
+                  border: `1px solid ${activo ? "#adc6ff" : "rgba(141,145,155,0.18)"}`,
+                }}
               >
-                <span className="material-symbols-outlined text-[18px]">{tipo.icon}</span>
+                <span className="material-symbols-outlined text-[16px]">{tipo.icon}</span>
                 {tipo.label}
               </Link>
             );
@@ -153,8 +159,8 @@ export default async function CalendarioPage({
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
-          <section className="bg-surface-container/95 rounded-3xl border border-outline-variant/10 p-4 md:p-6 shadow-2xl shadow-black/10">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
+          <section className="bg-surface-container/60 rounded-2xl border border-outline-variant/10 p-4 md:p-5">
             <CalendarioMensual
               eventos={eventosMes}
               fecha={mesActivo}
@@ -163,8 +169,8 @@ export default async function CalendarioPage({
             />
           </section>
 
-          <aside className="space-y-6">
-            <section className="bg-primary-container/15 rounded-3xl border border-primary/25 p-5 shadow-2xl shadow-black/10">
+          <aside className="space-y-5">
+            <section className="bg-primary/[0.06] rounded-2xl border border-primary/20 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-primary font-label">
                   Detalle
@@ -185,7 +191,7 @@ export default async function CalendarioPage({
               )}
             </section>
 
-            <section className="bg-surface-container/95 rounded-3xl border border-outline-variant/10 p-5 shadow-2xl shadow-black/10">
+            <section className="bg-surface-container/60 rounded-2xl border border-outline-variant/10 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-outline font-label">
                   Proximos
@@ -249,10 +255,24 @@ function CalendarioMensual({
   const eventosPorDia = agruparPorDia(eventos);
   const hoyKey = toISODate(new Date());
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-7 gap-2 text-center text-[10px] uppercase tracking-widest font-bold text-outline font-label">
-        {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((dia) => (
-          <div key={dia}>{dia}</div>
+    <div className="space-y-2.5">
+      {/* Header de días — estilo agenda */}
+      <div
+        className="grid grid-cols-7 rounded-xl overflow-hidden"
+        style={{ background: "rgba(8,14,30,0.75)", border: "1px solid rgba(141,145,155,0.12)" }}
+      >
+        {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((dia, i) => (
+          <div
+            key={dia}
+            className="text-center font-headline uppercase"
+            style={{
+              fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em",
+              color: "rgba(218,226,253,0.92)", padding: "10px 0",
+              borderLeft: i === 0 ? "none" : "1px solid rgba(141,145,155,0.08)",
+            }}
+          >
+            {dia}
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-2">
@@ -285,7 +305,8 @@ function CalendarioMensual({
                 {delDia.slice(0, 3).map((evento) => (
                   <span
                     key={evento.id}
-                    className={`block truncate rounded-lg border px-2 py-1 text-[11px] font-medium ${TIPO_STYLE[evento.tipo].chip}`}
+                    className="block truncate px-2 py-1 text-[11px] font-bold font-label"
+                    style={{ borderRadius: "7px", ...eventoChipStyle(evento.tipo) }}
                   >
                     {evento.titulo}
                   </span>
@@ -354,8 +375,8 @@ function EventoListaItem({
           </span>
         </span>
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-outline font-label">
-            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold font-label" style={{ color: style.text }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: `rgb(${style.rgb})` }} />
             {style.label}
           </span>
           <span className="block text-sm font-bold text-on-surface truncate mt-1">
@@ -413,15 +434,25 @@ function DetalleEvento({
 }) {
   const style = TIPO_STYLE[evento.tipo];
   return (
-    <article className="space-y-3 rounded-2xl border border-outline-variant/15 bg-surface-container-high/35 p-4">
+    <article
+      className="space-y-3 rounded-2xl p-4"
+      style={{
+        background: `linear-gradient(0deg, rgba(${style.rgb},0.06), rgba(${style.rgb},0.06)), rgba(34,42,61,0.35)`,
+        border: `1px solid rgba(${style.rgb},0.22)`,
+        borderLeft: `3px solid rgb(${style.rgb})`,
+      }}
+    >
       <div className="flex items-start gap-3">
-        <span className="w-10 h-10 rounded-xl bg-surface-container-highest border border-outline-variant/20 flex items-center justify-center shrink-0">
-          <span className="material-symbols-outlined text-[22px] text-primary">
+        <span
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: `rgba(${style.rgb},0.14)`, border: `1px solid rgba(${style.rgb},0.25)` }}
+        >
+          <span className="material-symbols-outlined text-[22px]" style={{ color: style.text }}>
             {style.icon}
           </span>
         </span>
         <div className="min-w-0">
-          <span className="text-[10px] uppercase tracking-widest font-bold text-primary font-label">
+          <span className="text-[10px] uppercase tracking-widest font-bold font-label" style={{ color: style.text }}>
             {style.label}
           </span>
           <h4 className="text-base font-bold font-headline text-on-surface leading-tight mt-1">
@@ -470,7 +501,7 @@ function DetalleEvento({
   );
 }
 
-function IconLink({
+function NavBtn({
   href,
   icon,
   label,
@@ -482,10 +513,11 @@ function IconLink({
   return (
     <Link
       href={href}
-      className="h-10 px-4 rounded-xl bg-surface-container border border-outline-variant/15 text-on-surface-variant hover:text-on-surface hover:border-primary/30 flex items-center gap-2 text-xs font-bold uppercase tracking-widest font-label transition-colors"
+      aria-label={label}
+      className="hz-yearchip w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface"
+      style={{ background: "rgba(34,42,61,0.6)", border: "1px solid rgba(141,145,155,0.18)" }}
     >
       <span className="material-symbols-outlined text-[18px]">{icon}</span>
-      {label}
     </Link>
   );
 }
