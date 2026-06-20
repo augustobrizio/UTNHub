@@ -7,15 +7,18 @@
  */
 import type {
   ConfirmarImportIn,
+  CriterioOptimizacion,
   EventoCalendarioOut,
   GrafoResponse,
   MateriaCursableOut,
   MateriaOut,
+  OptimizacionOut,
   PreviewImportSysacad,
   ResultadoImportSysacad,
   ResultadoSincCalendario,
   TipoEventoCalendario,
   TipoMateria,
+  TurnoPref,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -259,6 +262,30 @@ export async function seleccionarCursada(
   return res.json();
 }
 
+export async function optimizarHorario(
+  materias: string[],
+  anio: number,
+  cuatrimestre: number,
+  criterio: CriterioOptimizacion,
+  opts: { diaLibre?: string | null; turno?: TurnoPref | null } = {},
+): Promise<OptimizacionOut> {
+  const res = await fetch(`${MUTATION_BASE}/comisiones/optimizar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      materias, anio, cuatrimestre, criterio,
+      dia_libre: opts.diaLibre ?? null,
+      turno: opts.turno ?? null,
+    }),
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<OptimizacionOut>;
+}
+
 export async function deseleccionarCursada(
   usuarioId: number,
   materia_codigo: string,
@@ -303,4 +330,5 @@ export const api = {
   getComisionesCursables,
   seleccionarCursada,
   deseleccionarCursada,
+  optimizarHorario,
 };

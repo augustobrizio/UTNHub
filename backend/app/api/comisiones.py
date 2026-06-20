@@ -7,11 +7,40 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.comision import MateriaCursableOut, SeleccionarCursadaIn
+from app.schemas.comision import (
+    MateriaCursableOut,
+    OptimizacionOut,
+    OptimizarHorarioIn,
+    SeleccionarCursadaIn,
+)
 from app.schemas.materia import UsuarioMateriaOut
 from app.services import comision_service
 
 router = APIRouter(tags=["comisiones"])
+
+
+@router.post(
+    "/comisiones/optimizar",
+    response_model=OptimizacionOut,
+    summary="Optimizar la selección de comisiones según un criterio",
+)
+def optimizar_horario(
+    payload: OptimizarHorarioIn,
+    db: Annotated[Session, Depends(get_db)],
+) -> OptimizacionOut:
+    """Dado un conjunto de materias, prueba combinaciones de comisiones y
+    devuelve la mejor sin superposiciones según el criterio elegido
+    ('huecos', 'dias' o 'equilibrado').
+    """
+    return comision_service.optimizar_horario(
+        db,
+        materias=payload.materias,
+        anio=payload.anio,
+        cuatrimestre=payload.cuatrimestre,
+        criterio=payload.criterio,
+        dia_libre=payload.dia_libre,
+        turno=payload.turno,
+    )
 
 
 @router.get(

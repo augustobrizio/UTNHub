@@ -4,9 +4,11 @@ import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { seleccionarCursada, deseleccionarCursada } from "@/lib/api";
 import { materiaIcon } from "@/lib/materiaIcon";
-import type { HorarioOut, MateriaCursableOut } from "@/lib/types";
+import type { AsignacionOut, HorarioOut, MateriaCursableOut } from "@/lib/types";
+import { OptimizadorModal, type OptMateria } from "./OptimizadorModal";
 
 const USUARIO_ID = 1;
+const ANIO_ACADEMICO = 2025;
 
 const DIAS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"];
 const DIA_LABEL: Record<string, string> = {
@@ -100,6 +102,38 @@ function solapan(a: HorarioOut[], b: HorarioOut[]): boolean {
   return false;
 }
 
+/** Minutos totales de hueco entre clases del mismo día para un set de horarios. */
+function totalHuecosMin(items: { horarios: HorarioOut[] }[]): number {
+  const porDia = new Map<string, [number, number][]>();
+  for (const it of items) {
+    for (const h of it.horarios) {
+      const s = parseHF(h.hora_inicio), e = parseHF(h.hora_fin);
+      if (s == null || e == null || !h.dia) continue;
+      const dia = normDia(h.dia);
+      const arr = porDia.get(dia) ?? [];
+      arr.push([s * 60, e * 60]);
+      porDia.set(dia, arr);
+    }
+  }
+  let total = 0;
+  for (const arr of porDia.values()) {
+    arr.sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < arr.length; i++) {
+      const gap = arr[i][0] - arr[i - 1][1];
+      if (gap > 0) total += gap;
+    }
+  }
+  return Math.round(total);
+}
+
+function fmtHuecos(min: number): string {
+  if (min <= 0) return "sin huecos";
+  const h = Math.floor(min / 60), m = min % 60;
+  if (h && m) return `${h}h ${m}min de huecos`;
+  if (h) return `${h}h de huecos`;
+  return `${m}min de huecos`;
+}
+
 // ---------------------------------------------------------------------------
 interface Props {
   materias1: MateriaCursableOut[];
@@ -114,6 +148,7 @@ export function HorariosBuilder({ materias1, materias2, cuatriInicial }: Props) 
   const [cuatrimestre, setCuatrimestre] = useState<Idx>(cuatriInicial);
   const [loadingCodigo, setLoadingCodigo] = useState<string | null>(null);
   const [dragInfo, setDragInfo] = useState<{ codigo: string; comisionId: number } | null>(null);
+  const [optAbierto, setOptAbierto] = useState(false);
 
   // Merge de ambos cuatrimestres en un solo modelo por materia
   const { mergedList, mergedMap } = useMemo(() => {
@@ -240,6 +275,8 @@ export function HorariosBuilder({ materias1, materias2, cuatriInicial }: Props) 
     return res;
   }, [seleccion, mergedMap, cuatrimestre]);
 
+  const huecosMin = useMemo(() => totalHuecosMin(seleccionActiva), [seleccionActiva]);
+
   // ¿Agregar esta comisión genera superposición? Las anuales se chequean en ambos cuatris.
   function conflictaComision(mat: MMateria, com: MComision): boolean {
     const cuatris: Idx[] = mat.anual ? [0, 1] : [cuatrimestre];
@@ -292,6 +329,35 @@ export function HorariosBuilder({ materias1, materias2, cuatriInicial }: Props) 
     }
   }
 
+  // Materias del cuatrimestre actual en el formato que consume el optimizador
+  const materiasOpt: OptMateria[] = materiasVista.map(m => {
+    const c = colorCard(m.codigo);
+    return {
+      codigo: m.codigo,
+      nombre: m.nombre,
+      anio: m.anio,
+      anual: m.anual,
+      rgb: c.rgb,
+      text: c.text,
+      numComisiones: m.comisiones.filter(x => x.c[cuatrimestre]).length,
+    };
+  });
+
+  async function aplicarOptimizacion(asignaciones: AsignacionOut[]) {
+    setSeleccion(prev => {
+      const n = new Map(prev);
+      for (const a of asignaciones) {
+        const mat = mergedMap.get(a.materia_codigo);
+        n.set(a.materia_codigo, { comisionId: a.comision_id, cuatri: mat?.anual ? null : cuatrimestre });
+      }
+      return n;
+    });
+    try {
+      await Promise.all(asignaciones.map(a => seleccionarCursada(USUARIO_ID, a.materia_codigo, a.cursada_id)));
+    } catch (e) { console.error(e); }
+    startTransition(() => router.refresh());
+  }
+
   function switchCuatrimestre(idx: Idx) {
     setCuatrimestre(idx);
     for (let i = 1; i <= 5; i++) {
@@ -323,11 +389,34 @@ export function HorariosBuilder({ materias1, materias2, cuatriInicial }: Props) 
         <h1 className="text-[15px] font-black font-headline text-on-surface tracking-tight leading-none shrink-0">
           Armador de Horarios
         </h1>
-        <span className="text-[11px] text-outline/70 shrink-0">
-          {seleccionActiva.length} materia{seleccionActiva.length !== 1 ? "s" : ""} en este cuatrimestre
+        <span className="text-[11px] text-outline/70 shrink-0 flex items-center gap-2">
+          <span>{seleccionActiva.length} materia{seleccionActiva.length !== 1 ? "s" : ""} en este cuatrimestre</span>
+          {seleccionActiva.length > 0 && (
+            <>
+              <span className="text-outline/30">·</span>
+              <span
+                className="inline-flex items-center gap-1 font-semibold"
+                style={{ color: huecosMin > 0 ? "rgba(255,206,143,0.95)" : "rgba(156,255,194,0.95)" }}
+              >
+                <span className="material-symbols-outlined text-[13px]">compress</span>
+                {fmtHuecos(huecosMin)}
+              </span>
+            </>
+          )}
         </span>
 
         <div className="flex-1" />
+
+        {/* Botón de optimización */}
+        <button
+          onClick={() => setOptAbierto(true)}
+          title="Optimización de horarios"
+          className="hz-yearchip flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-xs font-bold font-label shrink-0"
+          style={{ color: "#0b1326", background: "linear-gradient(135deg,#adc6ff,#7dffa2)", boxShadow: "0 2px 10px rgba(173,198,255,0.22)" }}
+        >
+          <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+          Optimizar
+        </button>
 
         <div className="flex gap-0.5 p-0.5 rounded-[10px] shrink-0" style={{ backgroundColor: "rgba(6,14,32,0.9)", border: "1px solid rgba(141,145,155,0.1)" }}>
           {["1° Cuatrimestre", "2° Cuatrimestre"].map((label, i) => (
@@ -525,6 +614,17 @@ export function HorariosBuilder({ materias1, materias2, cuatriInicial }: Props) 
           <ScheduleGrid seleccionados={seleccionActiva} colorMap={colorAsignado} dragging={!!dragInfo} onRemove={quitarMateria} />
         </div>
       </div>
+
+      {optAbierto && (
+        <OptimizadorModal
+          materias={materiasOpt}
+          preseleccionados={[...seleccion.keys()]}
+          anio={ANIO_ACADEMICO}
+          cuatrimestre={cuatrimestre === 0 ? 1 : 2}
+          onAplicar={aplicarOptimizacion}
+          onClose={() => setOptAbierto(false)}
+        />
+      )}
     </div>
   );
 }

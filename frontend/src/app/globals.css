@@ -146,3 +146,43 @@
 .hz-yearchip {
   transition: background 0.16s ease-out, color 0.16s ease-out, border-color 0.16s ease-out;
 }
+
+/* =====================================================================
+ * Calendario académico — microinteracciones
+ * ===================================================================*/
+
+.cal-card {
+  transition: transform 0.18s ease-out, background 0.18s ease-out, border-color 0.18s ease-out, box-shadow 0.18s ease-out;
+}
+.cal-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+
+.cal-day {
+  transition: background 0.15s ease-out, border-color 0.15s ease-out, transform 0.15s ease-out;
+}
+.cal-day:hover {
+  border-color: rgba(173, 198, 255, 0.3) !important;
+}
+
+.cal-row {
+  transition: background 0.15s ease-out, transform 0.15s ease-out;
+}
+.cal-row:hover {
+  transform: translateX(2px);
+}
+
+/* Día actual: glow verde sutil */
+.cal-today-glow {
+  box-shadow: 0 0 0 1px rgba(125, 255, 162, 0.35), 0 0 16px rgba(125, 255, 162, 0.14);
+}
+
+/* Transición al cambiar de mes / vista */
+@keyframes cal-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.cal-fade {
+  animation: cal-fade 0.2s ease-out;
+}

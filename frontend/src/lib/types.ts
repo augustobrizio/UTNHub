@@ -166,6 +166,32 @@ export interface MateriaCursableOut {
   comisiones: ComisionCursadaOut[];
 }
 
+// Optimizador de horarios
+export type CriterioOptimizacion = "huecos" | "dias" | "turno";
+export type TurnoPref = "manana" | "tarde" | "noche";
+
+export interface AsignacionOut {
+  materia_codigo: string;
+  materia_nombre: string;
+  comision_id: number;
+  comision_nombre: string | null;
+  cursada_id: number;
+  horarios: HorarioOut[];
+}
+
+export interface OptimizacionOut {
+  ok: boolean;
+  motivo: string | null;
+  criterio: CriterioOptimizacion;
+  total_huecos_min: number;
+  dias_usados: number;
+  combinaciones_evaluadas: number;
+  materias_sin_comision: string[];
+  asignaciones: AsignacionOut[];
+  dia_libre_ok: boolean;
+  dias_libres_posibles: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Calendario academico - refleja `app/schemas/calendario.py`
 // ---------------------------------------------------------------------------
