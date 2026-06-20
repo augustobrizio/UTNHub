@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from sqlalchemy import select
+
 from app.db.models.academico import CondicionMateria, Cursada, Materia, UsuarioMateria
 from app.repositories import comision_repo, materia_repo
 from app.schemas.comision import (
@@ -44,6 +46,20 @@ def materias_cursables_con_comisiones(
     if not codigos_objetivo:
         return []
 
+    # Selecciones actuales del usuario (materia_codigo -> cursada_id)
+    stmt_sel = (
+        select(UsuarioMateria.materia_codigo, UsuarioMateria.cursada_id)
+        .where(
+            UsuarioMateria.usuario_id == usuario_id,
+            UsuarioMateria.cursada_id.is_not(None),
+        )
+    )
+    selecciones: dict[str, int] = {
+        row.materia_codigo: row.cursada_id
+        for row in db.execute(stmt_sel).all()
+        if row.cursada_id is not None
+    }
+
     cursadas = comision_repo.cursadas_para_materias(
         db, codigos=codigos_objetivo, anio=anio, cuatrimestre=cuatrimestre
     )
@@ -84,6 +100,7 @@ def materias_cursables_con_comisiones(
                 materia_codigo=codigo,
                 materia_nombre=materia.nombre,
                 anio_carrera=materia.anio_carrera,
+                cursada_seleccionada_id=selecciones.get(codigo),
                 comisiones=comisiones_out,
             )
         )

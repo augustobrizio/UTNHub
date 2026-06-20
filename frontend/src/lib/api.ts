@@ -9,6 +9,7 @@ import type {
   ConfirmarImportIn,
   EventoCalendarioOut,
   GrafoResponse,
+  MateriaCursableOut,
   MateriaOut,
   PreviewImportSysacad,
   ResultadoImportSysacad,
@@ -218,6 +219,62 @@ export async function confirmarImportarSysacad(
   return res.json() as Promise<ResultadoImportSysacad>;
 }
 
+// ---------------------------------------------------------------------------
+// Horarios / comisiones
+// ---------------------------------------------------------------------------
+
+export function getComisionesCursables(
+  usuarioId: number,
+  anio: number,
+  cuatrimestre: number,
+): Promise<MateriaCursableOut[]> {
+  const qs = new URLSearchParams({
+    usuario_id: String(usuarioId),
+    anio: String(anio),
+    cuatrimestre: String(cuatrimestre),
+  });
+  return request<MateriaCursableOut[]>(`/comisiones/cursables?${qs.toString()}`, {
+    revalidate: 0,
+  });
+}
+
+export async function seleccionarCursada(
+  usuarioId: number,
+  materia_codigo: string,
+  cursada_id: number,
+): Promise<unknown> {
+  const res = await fetch(
+    `${MUTATION_BASE}/usuarios/${usuarioId}/materias/${materia_codigo}/cursada`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ cursada_id }),
+    },
+  );
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json();
+}
+
+export async function deseleccionarCursada(
+  usuarioId: number,
+  materia_codigo: string,
+): Promise<void> {
+  const res = await fetch(
+    `${MUTATION_BASE}/usuarios/${usuarioId}/materias/${materia_codigo}/cursada`,
+    {
+      method: "DELETE",
+      headers: { Accept: "application/json" },
+    },
+  );
+  if (!res.ok && res.status !== 404) {
+    throw new ApiError(res.status, null);
+  }
+}
+
 export async function sincronizarCalendario(): Promise<ResultadoSincCalendario> {
   const res = await fetch(`${MUTATION_BASE}/calendario/sincronizar`, {
     method: "POST",
@@ -243,4 +300,7 @@ export const api = {
   previewImportarSysacad,
   confirmarImportarSysacad,
   sincronizarCalendario,
+  getComisionesCursables,
+  seleccionarCursada,
+  deseleccionarCursada,
 };

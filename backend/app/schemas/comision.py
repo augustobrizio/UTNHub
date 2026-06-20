@@ -41,6 +41,7 @@ class MateriaCursableOut(BaseModel):
     materia_codigo: str
     materia_nombre: str
     anio_carrera: int | None = None
+    cursada_seleccionada_id: int | None = None
     comisiones: list[ComisionCursadaOut] = []
 
     model_config = ConfigDict(from_attributes=True)

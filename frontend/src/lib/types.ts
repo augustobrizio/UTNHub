@@ -139,6 +139,33 @@ export interface ResultadoImportSysacad {
 }
 
 // ---------------------------------------------------------------------------
+// Horarios / comisiones — refleja `app/schemas/comision.py`
+// ---------------------------------------------------------------------------
+
+export interface HorarioOut {
+  dia: string | null;
+  hora_inicio: string | null; // "HH:MM:SS"
+  hora_fin: string | null;    // "HH:MM:SS"
+  aula: string | null;
+}
+
+export interface ComisionCursadaOut {
+  comision_id: number;
+  comision_nombre: string | null;
+  cursada_id: number;
+  docente: string | null;
+  horarios: HorarioOut[];
+}
+
+export interface MateriaCursableOut {
+  materia_codigo: string;
+  materia_nombre: string;
+  anio_carrera: number | null;
+  cursada_seleccionada_id: number | null;
+  comisiones: ComisionCursadaOut[];
+}
+
+// ---------------------------------------------------------------------------
 // Calendario academico - refleja `app/schemas/calendario.py`
 // ---------------------------------------------------------------------------
 
