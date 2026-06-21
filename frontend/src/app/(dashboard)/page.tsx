@@ -128,9 +128,10 @@ function eventoToAgendaItem(evento: EventoCalendarioOut): AgendaItem {
 }
 
 function etiquetaTipo(tipo: EventoCalendarioOut["tipo"]): string {
-  const etiquetas = {
+  const etiquetas: Record<EventoCalendarioOut["tipo"], string> = {
     examen: "Examen",
-    inscripcion: "Inscripcion",
+    mesa: "Mesa",
+    trabajo_practico: "TP",
     feriado: "Feriado",
     evento: "Evento",
   };
@@ -138,9 +139,10 @@ function etiquetaTipo(tipo: EventoCalendarioOut["tipo"]): string {
 }
 
 function iconoTipo(tipo: EventoCalendarioOut["tipo"]): string {
-  const iconos = {
+  const iconos: Record<EventoCalendarioOut["tipo"], string> = {
     examen: "event_upcoming",
-    inscripcion: "edit_calendar",
+    mesa: "groups",
+    trabajo_practico: "assignment",
     feriado: "beach_access",
     evento: "calendar_month",
   };

@@ -8,6 +8,7 @@
 import type {
   ConfirmarImportIn,
   CriterioOptimizacion,
+  EventoCalendarioCreate,
   EventoCalendarioOut,
   GrafoResponse,
   MateriaCursableOut,
@@ -302,6 +303,51 @@ export async function deseleccionarCursada(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Eventos propios del alumno (CRUD)
+// ---------------------------------------------------------------------------
+
+export async function crearEvento(payload: EventoCalendarioCreate): Promise<EventoCalendarioOut> {
+  const res = await fetch(`${MUTATION_BASE}/calendario/eventos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<EventoCalendarioOut>;
+}
+
+export async function actualizarEvento(
+  id: number,
+  payload: Partial<EventoCalendarioCreate>,
+): Promise<EventoCalendarioOut> {
+  const res = await fetch(`${MUTATION_BASE}/calendario/eventos/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<EventoCalendarioOut>;
+}
+
+export async function eliminarEvento(id: number): Promise<void> {
+  const res = await fetch(`${MUTATION_BASE}/calendario/eventos/${id}`, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new ApiError(res.status, null);
+  }
+}
+
 export async function sincronizarCalendario(): Promise<ResultadoSincCalendario> {
   const res = await fetch(`${MUTATION_BASE}/calendario/sincronizar`, {
     method: "POST",
@@ -327,6 +373,9 @@ export const api = {
   previewImportarSysacad,
   confirmarImportarSysacad,
   sincronizarCalendario,
+  crearEvento,
+  actualizarEvento,
+  eliminarEvento,
   getComisionesCursables,
   seleccionarCursada,
   deseleccionarCursada,

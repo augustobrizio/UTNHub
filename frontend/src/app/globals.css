@@ -186,3 +186,26 @@
 .cal-fade {
   animation: cal-fade 0.2s ease-out;
 }
+
+/* Paneles con profundidad en lugar de bordes (estilo Linear/Vercel) */
+.cal-panel {
+  background: rgba(18, 26, 46, 0.55);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 14px 36px -16px rgba(0, 0, 0, 0.55);
+}
+
+/* Chip de filtro multi-select */
+.cal-chip {
+  transition: background 0.15s ease-out, color 0.15s ease-out, box-shadow 0.15s ease-out, opacity 0.15s ease-out;
+}
+
+/* Skeleton shimmer */
+@keyframes cal-shimmer {
+  0% { background-position: -420px 0; }
+  100% { background-position: 420px 0; }
+}
+.cal-skel {
+  background: linear-gradient(90deg, rgba(141,145,155,0.06) 25%, rgba(141,145,155,0.14) 37%, rgba(141,145,155,0.06) 63%);
+  background-size: 840px 100%;
+  animation: cal-shimmer 1.4s infinite linear;
+  border-radius: 10px;
+}

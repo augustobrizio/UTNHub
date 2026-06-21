@@ -1,6 +1,7 @@
 """Repository del calendario academico."""
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from datetime import date, datetime, time
 
@@ -58,6 +59,38 @@ def listar_eventos_del_dia(
 def get_evento(db: Session, evento_id: int) -> EventoCalendario | None:
     """Obtiene un evento por ID."""
     return db.get(EventoCalendario, evento_id)
+
+
+def crear_evento_usuario(
+    db: Session,
+    *,
+    titulo: str,
+    descripcion: str | None,
+    fecha_inicio: datetime,
+    fecha_fin: datetime | None,
+    tipo: str,
+    carrera: str | None = "ISI",
+) -> EventoCalendario:
+    """Crea un evento de origen 'usuario'."""
+    evento = EventoCalendario(
+        titulo=titulo,
+        descripcion=descripcion,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        tipo=tipo,
+        carrera=carrera,
+        fuente_url=None,
+        content_hash=f"user-{uuid.uuid4().hex}",
+        origen="usuario",
+    )
+    db.add(evento)
+    db.flush()
+    return evento
+
+
+def eliminar_evento(db: Session, evento: EventoCalendario) -> None:
+    db.delete(evento)
+    db.flush()
 
 
 def get_by_content_hash(db: Session, content_hash: str) -> EventoCalendario | None:

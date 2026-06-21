@@ -20,7 +20,7 @@ FUENTES_V1: tuple[calendario_scraper.FuenteCalendario, ...] = (
     calendario_scraper.FuenteCalendario(
         url=calendario_scraper.URL_MESAS_ISI,
         carrera="ISI",
-        tipo_preferido="examen",
+        tipo_preferido="mesa",
     ),
 )
 
@@ -67,6 +67,54 @@ def eventos_hoy(db: Session, *, carrera: str | None = "ISI"):
 def get_evento(db: Session, evento_id: int):
     """Obtiene un evento por ID."""
     return calendario_repo.get_evento(db, evento_id)
+
+
+# ---------------------------------------------------------------------------
+# Eventos creados por el alumno (CRUD)
+# ---------------------------------------------------------------------------
+
+
+def crear_evento_usuario(
+    db: Session,
+    *,
+    titulo: str,
+    descripcion: str | None,
+    fecha_inicio: datetime,
+    fecha_fin: datetime | None,
+    tipo: str,
+):
+    """Crea un evento propio del alumno."""
+    return calendario_repo.crear_evento_usuario(
+        db,
+        titulo=titulo,
+        descripcion=descripcion,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        tipo=tipo,
+    )
+
+
+def actualizar_evento_usuario(db: Session, evento_id: int, cambios: dict):
+    """Actualiza un evento del alumno. Lanza ValueError si no existe o no es editable."""
+    evento = calendario_repo.get_evento(db, evento_id)
+    if evento is None:
+        raise ValueError("no_encontrado")
+    if evento.origen != "usuario":
+        raise ValueError("no_editable")
+    for campo, valor in cambios.items():
+        if valor is not None:
+            setattr(evento, campo, valor)
+    db.flush()
+    return evento
+
+
+def eliminar_evento_usuario(db: Session, evento_id: int) -> bool:
+    """Elimina un evento del alumno. Devuelve False si no existe o no es propio."""
+    evento = calendario_repo.get_evento(db, evento_id)
+    if evento is None or evento.origen != "usuario":
+        return False
+    calendario_repo.eliminar_evento(db, evento)
+    return True
 
 
 def sincronizar_calendario(db: Session) -> ResultadoSincCalendario:

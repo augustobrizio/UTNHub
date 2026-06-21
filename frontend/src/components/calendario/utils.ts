@@ -17,12 +17,13 @@ export interface TipoConfig {
 
 export const TIPO: Record<TipoEventoCalendario, TipoConfig> = {
   examen: { label: "Examen", plural: "Exámenes", emoji: "📝", icon: "history_edu", rgb: "255,120,120", text: "#ffb0b0", peso: 4 },
-  inscripcion: { label: "Inscripción", plural: "Inscripciones", emoji: "📚", icon: "how_to_reg", rgb: "138,180,255", text: "#bcd4ff", peso: 3 },
+  mesa: { label: "Mesa", plural: "Mesas de examen", emoji: "🎓", icon: "groups", rgb: "190,150,255", text: "#d3c2ff", peso: 2 },
+  trabajo_practico: { label: "TP", plural: "Trabajos prácticos", emoji: "📋", icon: "assignment", rgb: "138,180,255", text: "#bcd4ff", peso: 3 },
   evento: { label: "Evento", plural: "Eventos", emoji: "🎉", icon: "celebration", rgb: "125,255,162", text: "#9cffc2", peso: 1 },
   feriado: { label: "Feriado", plural: "Feriados", emoji: "🏖️", icon: "beach_access", rgb: "255,214,92", text: "#ffe4a5", peso: 0 },
 };
 
-export const ORDEN_TIPOS: TipoEventoCalendario[] = ["examen", "inscripcion", "evento", "feriado"];
+export const ORDEN_TIPOS: TipoEventoCalendario[] = ["examen", "mesa", "trabajo_practico", "evento", "feriado"];
 
 // ---------------------------------------------------------------------------
 // Fechas
@@ -78,7 +79,7 @@ export function diasSemana(f: Date): Date[] {
 /** Días (ISO) que ocupa un evento (los feriados/exámenes pueden abarcar rango). */
 export function diasDelEvento(e: EventoCalendarioOut): string[] {
   const ini = inicioDia(new Date(e.fecha_inicio));
-  if (e.tipo === "inscripcion" || e.tipo === "evento") return [toISODate(ini)];
+  if (e.tipo === "trabajo_practico" || e.tipo === "evento") return [toISODate(ini)];
   const fin = e.fecha_fin ? inicioDia(new Date(e.fecha_fin)) : ini;
   const out: string[] = [];
   const cur = new Date(ini);

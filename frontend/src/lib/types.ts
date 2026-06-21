@@ -196,7 +196,7 @@ export interface OptimizacionOut {
 // Calendario academico - refleja `app/schemas/calendario.py`
 // ---------------------------------------------------------------------------
 
-export type TipoEventoCalendario = "examen" | "inscripcion" | "feriado" | "evento";
+export type TipoEventoCalendario = "examen" | "mesa" | "trabajo_practico" | "feriado" | "evento";
 
 export interface EventoCalendarioOut {
   id: number;
@@ -207,6 +207,15 @@ export interface EventoCalendarioOut {
   tipo: TipoEventoCalendario;
   carrera: string | null;
   fuente_url: string | null;
+  origen: string; // "sistema" | "usuario"
+}
+
+export interface EventoCalendarioCreate {
+  titulo: string;
+  descripcion?: string | null;
+  fecha_inicio: string;
+  fecha_fin?: string | null;
+  tipo: TipoEventoCalendario;
 }
 
 export interface ResultadoSincCalendario {
