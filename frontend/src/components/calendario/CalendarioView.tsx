@@ -26,11 +26,6 @@ const METRICAS: { tipo: TipoEventoCalendario; label: string }[] = [
   { tipo: "feriado", label: "Feriados" },
 ];
 
-function en30(e: EventoCalendarioOut): boolean {
-  const n = diffDias(toISODate(new Date(e.fecha_inicio)));
-  return n >= 0 && n <= 30;
-}
-
 function coincide(e: EventoCalendarioOut, q: string): boolean {
   if (!q) return true;
   const s = q.toLowerCase();
@@ -43,15 +38,32 @@ function coincide(e: EventoCalendarioOut, q: string): boolean {
   );
 }
 
+// Orden de prioridad para el borde coloreado de cada celda de día.
+const PRIORIDAD_BORDER: TipoEventoCalendario[] = [
+  "examen", "trabajo_practico", "mesa", "evento", "feriado",
+];
+
+/**
+ * Devuelve el box-shadow que dibuja el(los) borde(s) de color de una celda.
+ * - 1 tipo → borde simple de 1.5 px
+ * - 2+ tipos → anillo interior del tipo más importante + anillo exterior del siguiente
+ */
+function calcBorderShadow(eventos: EventoCalendarioOut[]): string | undefined {
+  const presentes = PRIORIDAD_BORDER.filter((t) => eventos.some((e) => e.tipo === t));
+  if (presentes.length === 0) return undefined;
+  const [p1, p2] = presentes;
+  const s1 = `inset 0 0 0 1.5px rgba(${TIPO[p1].rgb},0.85)`;
+  if (!p2) return s1;
+  return `${s1}, inset 0 0 0 3px rgba(${TIPO[p2].rgb},0.6)`;
+}
+
 export function CalendarioView({ eventos: eventosProp }: { eventos: EventoCalendarioOut[] }) {
   const [eventos, setEventos] = useState(eventosProp);
   const [vista, setVista] = useState<Vista>("mes");
   const [visibles, setVisibles] = useState<Set<TipoEventoCalendario>>(() => new Set(ORDEN_TIPOS));
+  const [horizonte, setHorizonte] = useState<number | null>(null);
   const [query, setQuery] = useState("");
-  const [ancla, setAncla] = useState<Date>(() => {
-    const fut = eventosFuturos(eventosProp);
-    return inicioMes(fut[0] ? new Date(fut[0].fecha_inicio) : HOY);
-  });
+  const [ancla, setAncla] = useState<Date>(() => inicioMes(HOY));
   const [diaSel, setDiaSel] = useState<string | null>(null);
   const [modal, setModal] = useState<{ modo: "crear" | "editar"; evento?: EventoCalendarioOut; fecha?: string; plantilla?: { titulo?: string; tipo?: TipoEventoCalendario } } | null>(null);
 
@@ -65,21 +77,49 @@ export function CalendarioView({ eventos: eventosProp }: { eventos: EventoCalend
     if (prevRef.current !== eventosProp) { prevRef.current = eventosProp; setEventos(eventosProp); }
   }, [eventosProp]);
 
-  const visiblesArr = useMemo(() => eventos.filter((e) => visibles.has(e.tipo) && coincide(e, query)), [eventos, visibles, query]);
+  const visiblesArr = useMemo(() => eventos.filter((e) => {
+    if (!visibles.has(e.tipo)) return false;
+    if (!coincide(e, query)) return false;
+    if (horizonte !== null) {
+      const n = diffDias(toISODate(new Date(e.fecha_inicio)));
+      return n >= 0 && n <= horizonte;
+    }
+    return true;
+  }), [eventos, visibles, query, horizonte]);
   const futuros = useMemo(() => eventosFuturos(eventos), [eventos]);
   const futurosVisibles = useMemo(() => eventosFuturos(visiblesArr), [visiblesArr]);
+  // Cuando hay búsqueda activa mostramos todos los eventos que matchean (no solo futuros)
+  // y los ordenamos cronológicamente.
+  const agendaEventos = useMemo(
+    () =>
+      query
+        ? [...visiblesArr].sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())
+        : futurosVisibles,
+    [query, visiblesArr, futurosVisibles],
+  );
   const importante = useMemo(() => proximoImportante(eventos), [eventos]);
 
   const conteos = useMemo(() => {
+    const lim = horizonte ?? 30;
     const c: Record<string, number> = {};
     for (const m of METRICAS) {
-      c[m.tipo] = eventos.filter((e) => en30(e) && e.tipo === m.tipo).length;
+      c[m.tipo] = eventos.filter((e) => {
+        const n = diffDias(toISODate(new Date(e.fecha_inicio)));
+        return n >= 0 && n <= lim && e.tipo === m.tipo;
+      }).length;
     }
     return c;
-  }, [eventos]);
+  }, [eventos, horizonte]);
 
   const eventosMes = useMemo(() => eventos.filter((e) => eventoTocaMes(e, ancla)).length, [eventos, ancla]);
   const eventosDia = useMemo(() => (diaSel ? agruparPorDia(visiblesArr).get(diaSel) ?? [] : []), [diaSel, visiblesArr]);
+
+  // Al tipear en el buscador cambiamos a agenda para que los resultados siempre sean visibles,
+  // independientemente del mes que esté anclado en el calendario.
+  const handleSearch = (q: string) => {
+    setQuery(q);
+    if (q) { setVista("agenda"); setDiaSel(null); }
+  };
 
   const nav = (dir: -1 | 1) => { setDiaSel(null); setAncla((a) => (vista === "semana" ? sumarDias(a, dir * 7) : sumarMeses(a, dir))); };
   const irHoy = () => { setDiaSel(null); setAncla(inicioMes(HOY)); };
@@ -101,16 +141,42 @@ export function CalendarioView({ eventos: eventosProp }: { eventos: EventoCalend
     setEventos((es) => es.filter((e) => e.id !== id));
   }
 
+  const onEditar = (e: EventoCalendarioOut) => setModal({ modo: "editar", evento: e });
+
   const onEvento = (e: EventoCalendarioOut) => {
-    if (e.origen === "usuario") setModal({ modo: "editar", evento: e });
-    else setDiaSel(toISODate(new Date(e.fecha_inicio)));
+    if (vista === "agenda") {
+      // Navegar al mes/día del evento en la vista calendario
+      const d = new Date(e.fecha_inicio);
+      setQuery("");
+      setVista("mes");
+      setAncla(inicioMes(d));
+      setDiaSel(toISODate(d));
+    } else if (e.origen === "usuario") {
+      setModal({ modo: "editar", evento: e });
+    } else {
+      setDiaSel(toISODate(new Date(e.fecha_inicio)));
+    }
   };
   const onSelDia = (iso: string) => setDiaSel((d) => (d === iso ? null : iso));
   const onCrearDia = (iso: string) => setModal({ modo: "crear", fecha: iso });
-  const toggleTipo = (t: TipoEventoCalendario) => setVisibles((s) => { const n = new Set(s); if (n.has(t)) n.delete(t); else n.add(t); return n; });
+  const toggleTipo = (t: TipoEventoCalendario) => setVisibles((s) => {
+    // Desde "todos activos" → aislar solo este tipo
+    if (s.size === ORDEN_TIPOS.length) return new Set([t]);
+    // Solo este tipo activo → volver a todos
+    if (s.size === 1 && s.has(t)) return new Set(ORDEN_TIPOS);
+    // Estado intermedio → toggle normal (add/remove)
+    const n = new Set(s);
+    if (n.has(t)) n.delete(t); else n.add(t);
+    if (n.size === 0) return new Set(ORDEN_TIPOS);
+    return n;
+  });
 
   const titulo = vista === "semana" ? rangoSemanaLabel(ancla) : vista === "agenda" ? "Agenda" : mesLargo(ancla);
-  const subtitulo = vista === "agenda" ? `${futuros.length} próximos` : `${eventosMes} evento${eventosMes === 1 ? "" : "s"} este mes`;
+  const subtitulo = query
+    ? `${agendaEventos.length} resultado${agendaEventos.length === 1 ? "" : "s"}`
+    : vista === "agenda"
+      ? `${futuros.length} próximos`
+      : `${eventosMes} evento${eventosMes === 1 ? "" : "s"} este mes`;
 
   return (
     <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-4">
@@ -124,7 +190,7 @@ export function CalendarioView({ eventos: eventosProp }: { eventos: EventoCalend
         </nav>
 
         <div className="flex-1 min-w-0 max-w-md mx-auto hidden sm:block">
-          <SearchBar value={query} onChange={setQuery} />
+          <SearchBar value={query} onChange={handleSearch} />
         </div>
 
         <button
@@ -137,7 +203,7 @@ export function CalendarioView({ eventos: eventosProp }: { eventos: EventoCalend
         </button>
       </div>
 
-      <div className="sm:hidden"><SearchBar value={query} onChange={setQuery} /></div>
+      <div className="sm:hidden"><SearchBar value={query} onChange={handleSearch} /></div>
 
       {/* ── Título + vistas + navegación ───────────────────────────────── */}
       <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -152,17 +218,26 @@ export function CalendarioView({ eventos: eventosProp }: { eventos: EventoCalend
                 style={{ color: vista === v ? "#0b1326" : "rgba(195,198,209,0.7)", background: vista === v ? "#adc6ff" : "transparent" }}>{v}</button>
             ))}
           </div>
-          {vista !== "agenda" && (
-            <div className="flex items-center gap-0.5 p-0.5 rounded-xl shrink-0" style={{ background: "rgba(6,14,32,0.9)" }}>
-              <IconBtn icon="chevron_left" onClick={() => nav(-1)} label="Anterior" />
-              <button onClick={irHoy} className="px-3 h-8 rounded-lg text-xs font-bold font-label text-on-surface-variant hover:text-on-surface transition-colors">Hoy</button>
-              <IconBtn icon="chevron_right" onClick={() => nav(1)} label="Siguiente" />
-            </div>
-          )}
+          {/* El nav siempre ocupa espacio para evitar que los botones se muevan al cambiar a agenda */}
+          <div
+            className={`flex items-center gap-0.5 p-0.5 rounded-xl shrink-0 transition-opacity duration-150 ${vista === "agenda" ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+            style={{ background: "rgba(6,14,32,0.9)" }}
+            aria-hidden={vista === "agenda"}
+          >
+            <IconBtn icon="chevron_left" onClick={() => nav(-1)} label={vista === "semana" ? "Semana anterior" : "Mes anterior"} />
+            <button
+              onClick={irHoy}
+              title="Volver al mes actual"
+              className="px-3 h-8 rounded-lg text-xs font-bold font-label text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              Hoy
+            </button>
+            <IconBtn icon="chevron_right" onClick={() => nav(1)} label={vista === "semana" ? "Semana siguiente" : "Mes siguiente"} />
+          </div>
         </div>
       </div>
 
-      {/* ── Métricas (30 días) + filtros ───────────────────────────────── */}
+      {/* ── Métricas + filtros ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {METRICAS.map((m) => (
@@ -172,30 +247,55 @@ export function CalendarioView({ eventos: eventosProp }: { eventos: EventoCalend
               <span className="text-[11px] font-label text-on-surface-variant">{m.label}</span>
             </div>
           ))}
-          <span className="text-[10px] text-outline/40 font-label ml-1">próximos 30 días</span>
+          <span className="text-[10px] text-outline/40 font-label ml-1">
+            {horizonte !== null ? `próximos ${horizonte} días` : "próximos 30 días"}
+          </span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Chips de tipo — click para aislar, click al solo-activo para restaurar todos */}
           {ORDEN_TIPOS.map((t) => {
             const on = visibles.has(t);
+            const solo = visibles.size === 1 && on;
             return (
               <button key={t} onClick={() => toggleTipo(t)} className="cal-chip flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold font-label"
-                style={{ background: on ? `rgba(${TIPO[t].rgb},0.16)` : "rgba(34,42,61,0.4)", color: on ? TIPO[t].text : "rgba(141,145,155,0.6)", opacity: on ? 1 : 0.6, boxShadow: on ? `inset 0 0 0 1px rgba(${TIPO[t].rgb},0.35)` : "none" }}>
+                style={{ background: on ? `rgba(${TIPO[t].rgb},0.16)` : "rgba(34,42,61,0.4)", color: on ? TIPO[t].text : "rgba(141,145,155,0.6)", opacity: on ? 1 : 0.6, boxShadow: solo ? `inset 0 0 0 1.5px rgba(${TIPO[t].rgb},0.7)` : on ? `inset 0 0 0 1px rgba(${TIPO[t].rgb},0.35)` : "none" }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? `rgb(${TIPO[t].rgb})` : "rgba(141,145,155,0.5)" }} />
                 {TIPO[t].label}
               </button>
             );
           })}
+
+          {/* Separador */}
+          <span className="h-4 w-px bg-outline/15 mx-0.5 self-center" />
+
+          {/* Filtro de horizonte temporal */}
+          <div className="flex gap-0.5 p-0.5 rounded-xl" style={{ background: "rgba(6,14,32,0.85)" }}>
+            {([7, 14, 30, 60, null] as (number | null)[]).map((d) => {
+              const active = horizonte === d;
+              return (
+                <button
+                  key={d ?? "todo"}
+                  onClick={() => setHorizonte(d)}
+                  title={d === null ? "Sin límite de tiempo" : `Próximos ${d} días`}
+                  className="px-2 py-0.5 rounded-lg text-[10px] font-bold font-label transition-all"
+                  style={{ color: active ? "#0b1326" : "rgba(195,198,209,0.5)", background: active ? "#c3c6d1" : "transparent" }}
+                >
+                  {d === null ? "Todo" : `${d}d`}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* ── Cuerpo: calendario + panel ─────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_330px] gap-4 items-start">
         <section className="group relative cal-panel rounded-2xl p-3 md:p-4 min-w-0">
-          {vista !== "agenda" && <><SideArrow dir="left" onClick={() => nav(-1)} /><SideArrow dir="right" onClick={() => nav(1)} /></>}
+          {vista !== "agenda" && <><SideArrow dir="left" onClick={() => nav(-1)} label="Mes anterior" /><SideArrow dir="right" onClick={() => nav(1)} label="Mes siguiente" /></>}
           <div key={`${vista}-${toISODate(ancla)}`} className="cal-fade">
             {vista === "mes" && <MonthGrid ancla={ancla} eventos={visiblesArr} diaSel={diaSel} onSelDia={onSelDia} onEvento={onEvento} onCrear={onCrearDia} />}
             {vista === "semana" && <WeekGrid ancla={ancla} eventos={visiblesArr} diaSel={diaSel} onSelDia={onSelDia} onEvento={onEvento} onCrear={onCrearDia} />}
-            {vista === "agenda" && <AgendaList eventos={futurosVisibles} onEvento={onEvento} query={query} />}
+            {vista === "agenda" && <AgendaList eventos={agendaEventos} onEvento={onEvento} onEditar={onEditar} query={query} />}
           </div>
         </section>
 
@@ -259,6 +359,11 @@ function MonthGrid({ ancla, eventos, diaSel, onSelDia, onEvento, onCrear }: { an
           const esMes = dia.getMonth() === mesActual;
           const esHoy = key === hoyKey;
           const sel = key === diaSel;
+          const borderShadow = calcBorderShadow(delDia);
+          const boxShadow = [
+            sel ? "0 8px 20px -8px rgba(0,0,0,0.5)" : null,
+            borderShadow ?? null,
+          ].filter(Boolean).join(", ") || undefined;
           return (
             <div
               key={key}
@@ -268,7 +373,7 @@ function MonthGrid({ ancla, eventos, diaSel, onSelDia, onEvento, onCrear }: { an
               className={`cal-day min-h-[116px] rounded-xl p-2 overflow-hidden flex flex-col cursor-pointer select-none ${esHoy ? "cal-today-glow" : ""} ${sel ? "cal-card" : ""}`}
               style={{
                 background: sel ? "rgba(173,198,255,0.14)" : esMes ? "rgba(34,42,61,0.32)" : "rgba(34,42,61,0.1)",
-                boxShadow: sel ? "0 8px 20px -8px rgba(0,0,0,0.5)" : undefined,
+                boxShadow,
                 opacity: esMes ? 1 : 0.4,
               }}
             >
@@ -313,8 +418,10 @@ function WeekGrid({ ancla, eventos, diaSel, onSelDia, onEvento, onCrear }: { anc
         const delDia = porDia.get(key) ?? [];
         const esHoy = key === hoyKey;
         const sel = key === diaSel;
+        const weekBorder = calcBorderShadow(delDia);
+        const weekShadow = [sel ? "inset 0 0 0 1px rgba(173,198,255,0.4)" : null, weekBorder ?? null].filter(Boolean).join(", ") || undefined;
         return (
-          <div key={key} onClick={() => onSelDia(key)} onDoubleClick={() => onCrear(key)} title="Clic: ver · Doble clic: agregar evento" className={`rounded-xl p-2.5 min-h-[200px] flex flex-col cursor-pointer select-none ${esHoy ? "cal-today-glow" : ""}`} style={{ background: sel ? "rgba(173,198,255,0.12)" : "rgba(34,42,61,0.28)" }}>
+          <div key={key} onClick={() => onSelDia(key)} onDoubleClick={() => onCrear(key)} title="Clic: ver · Doble clic: agregar evento" className={`rounded-xl p-2.5 min-h-[200px] flex flex-col cursor-pointer select-none ${esHoy ? "cal-today-glow" : ""}`} style={{ background: sel ? "rgba(173,198,255,0.12)" : "rgba(34,42,61,0.28)", boxShadow: weekShadow }}>
             <div className="mb-2">
               <p className="text-[10px] uppercase tracking-wider font-bold font-label" style={{ color: esHoy ? "#9cffc2" : "rgba(141,145,155,0.7)" }}>{DIAS_LBL[i]}</p>
               <p className="text-lg font-black font-headline" style={{ color: esHoy ? "#9cffc2" : "#dae2fd" }}>{dia.getDate()}</p>
@@ -336,7 +443,7 @@ function WeekGrid({ ancla, eventos, diaSel, onSelDia, onEvento, onCrear }: { anc
 
 // ── Vista AGENDA ─────────────────────────────────────────────────────────────
 
-function AgendaList({ eventos, onEvento, query }: { eventos: EventoCalendarioOut[]; onEvento: (e: EventoCalendarioOut) => void; query: string }) {
+function AgendaList({ eventos, onEvento, onEditar, query }: { eventos: EventoCalendarioOut[]; onEvento: (e: EventoCalendarioOut) => void; onEditar: (e: EventoCalendarioOut) => void; query: string }) {
   if (eventos.length === 0) return <EmptyState texto={query ? `Sin resultados para “${query}”.` : "No hay eventos próximos."} />;
   const grupos = new Map<string, EventoCalendarioOut[]>();
   for (const e of eventos) {
@@ -360,16 +467,32 @@ function AgendaList({ eventos, onEvento, query }: { eventos: EventoCalendarioOut
             </div>
             <div className="flex-1 space-y-2 min-w-0">
               {evs.map((e) => (
-                <button key={e.id} onClick={() => onEvento(e)} className="cal-row block w-full text-left rounded-xl p-3" style={{ background: `rgba(${TIPO[e.tipo].rgb},0.08)`, borderLeft: `3px solid rgb(${TIPO[e.tipo].rgb})` }}>
+                <div
+                  key={e.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onEvento(e)}
+                  onKeyDown={(ev) => ev.key === "Enter" && onEvento(e)}
+                  className="cal-row w-full text-left rounded-xl p-3 cursor-pointer"
+                  style={{ background: `rgba(${TIPO[e.tipo].rgb},0.08)`, borderLeft: `3px solid rgb(${TIPO[e.tipo].rgb})` }}
+                >
                   <div className="flex items-center gap-2">
                     <span className="text-[15px]">{TIPO[e.tipo].emoji}</span>
                     <p className="font-headline font-bold text-[13px] flex-1 min-w-0 truncate" style={{ color: "#eaf0ff" }}>{e.titulo}</p>
-                    {e.origen === "usuario" && <span className="material-symbols-outlined text-[14px] text-outline/50">edit</span>}
+                    {e.origen === "usuario" && (
+                      <button
+                        onClick={(ev) => { ev.stopPropagation(); onEditar(e); }}
+                        title="Editar evento"
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-outline/50 hover:text-on-surface hover:bg-white/10 transition-colors shrink-0"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">edit</span>
+                      </button>
+                    )}
                     <span className="text-[10px] font-bold font-label px-2 py-0.5 rounded-md shrink-0" style={{ color: TIPO[e.tipo].text, background: `rgba(${TIPO[e.tipo].rgb},0.14)` }}>{TIPO[e.tipo].label}</span>
                   </div>
                   <p className="text-[11px] mt-1 pl-[23px]" style={{ color: "rgba(195,198,209,0.6)" }}>{rangoEvento(e)}</p>
                   {e.descripcion && <p className="text-[11px] mt-1 pl-[23px] line-clamp-2" style={{ color: "rgba(141,145,155,0.7)" }}>{e.descripcion}</p>}
-                </button>
+                </div>
               ))}
             </div>
           </div>
@@ -381,9 +504,9 @@ function AgendaList({ eventos, onEvento, query }: { eventos: EventoCalendarioOut
 
 // ── Flecha lateral ───────────────────────────────────────────────────────────
 
-function SideArrow({ dir, onClick }: { dir: "left" | "right"; onClick: () => void }) {
+function SideArrow({ dir, onClick, label }: { dir: "left" | "right"; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick} aria-label={dir === "left" ? "Período anterior" : "Período siguiente"} className="absolute top-1/2 -translate-y-1/2 z-10 w-9 h-16 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 hover:!opacity-100 transition-opacity duration-200"
+    <button onClick={onClick} aria-label={label} className="absolute top-1/2 -translate-y-1/2 z-10 w-9 h-16 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 hover:!opacity-100 transition-opacity duration-200"
       style={{ [dir]: "6px", background: "rgba(8,14,30,0.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "rgba(218,226,253,0.92)", boxShadow: "0 6px 18px -6px rgba(0,0,0,0.6)" }}>
       <span className="material-symbols-outlined text-[24px]">{dir === "left" ? "chevron_left" : "chevron_right"}</span>
     </button>
