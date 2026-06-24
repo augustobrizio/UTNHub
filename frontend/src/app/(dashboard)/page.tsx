@@ -39,6 +39,7 @@ const CONTADORES_VACIOS: ContadoresGrafo = {
   carga_horaria_cursando: 0,
   creditos_electivas: 0,
   meta_creditos_electivas: 0,
+  promedio_general: null,
 };
 
 // ---------------------------------------------------------------------------

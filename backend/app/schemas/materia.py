@@ -86,6 +86,9 @@ class ContadoresGrafo(BaseModel):
     carga_horaria_cursando: int = 0
     creditos_electivas: int = 0
     meta_creditos_electivas: int = 20
+    # Promedio sobre TODAS las materias aprobadas con nota (troncales + electivas).
+    # Es el mismo valor en ambas pestañas: refleja el promedio general de la carrera.
+    promedio_general: float | None = None
 
 
 class GrafoResponse(BaseModel):
@@ -221,6 +224,14 @@ class ConfirmarImportIn(BaseModel):
         True,
         description="Salta validacion de correlativas (historial pasado).",
     )
+    reemplazar: bool = Field(
+        False,
+        description=(
+            "Si es True, borra TODO el historial previo del usuario antes de "
+            "importar. Evita que se acumulen materias (ej: electivas) de "
+            "importaciones anteriores."
+        ),
+    )
 
 
 class ResultadoImportSysacad(BaseModel):
@@ -228,4 +239,5 @@ class ResultadoImportSysacad(BaseModel):
 
     importadas: int
     omitidas: int
+    eliminadas: int = 0
     errores: list[str] = Field(default_factory=list)

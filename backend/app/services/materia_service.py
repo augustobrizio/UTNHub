@@ -81,6 +81,19 @@ def construir_grafo(
         else {}
     )
 
+    # Promedio general cross-tab: todas las aprobadas con nota (troncales + electivas).
+    notas_aprobadas = [
+        nota
+        for codigo, nota in notas.items()
+        if nota is not None
+        and condiciones.get(codigo, CondicionMateria.NONE) == CondicionMateria.APROBADO
+    ]
+    promedio_general = (
+        round(sum(notas_aprobadas) / len(notas_aprobadas), 2)
+        if notas_aprobadas
+        else None
+    )
+
     # Indexar correlativas por materia destino para no recalcular en el loop.
     correlativas_por_materia: dict[str, list] = {}
     for corr in correlativas:
@@ -143,6 +156,7 @@ def construir_grafo(
         porcentaje_aprobadas=porcentaje,
         carga_horaria_cursando=carga_horaria_cursando,
         creditos_electivas=creditos_electivas,
+        promedio_general=promedio_general,
     )
 
     registros_usuario = {

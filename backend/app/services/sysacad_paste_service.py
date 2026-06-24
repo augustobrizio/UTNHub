@@ -282,12 +282,26 @@ def confirmar_importacion(
     usuario_id: int,
     payload: ConfirmarImportIn,
 ) -> ResultadoImportSysacad:
-    """Paso 2: aplica el batch upsert para los items con importar=True."""
-    from app.repositories.materia_repo import upsert_usuario_materia
+    """Paso 2: aplica el batch upsert para los items con importar=True.
+
+    Si ``payload.reemplazar`` es True, primero borra todo el historial previo
+    del usuario para que el pegado quede como única fuente de verdad (evita que
+    se acumulen materias de importaciones anteriores, ej: electivas distintas).
+    Todo ocurre en la misma transacción: si algo falla, no se commitea nada.
+    """
+    from app.repositories.materia_repo import (
+        delete_all_usuario_materias,
+        upsert_usuario_materia,
+    )
 
     importadas = 0
     omitidas = 0
+    eliminadas = 0
     errores: list[str] = []
+
+    if payload.reemplazar:
+        eliminadas = delete_all_usuario_materias(db, usuario_id)
+        db.flush()
 
     for item in payload.items:
         if not item.importar or not item.materia_codigo:
@@ -313,5 +327,6 @@ def confirmar_importacion(
     return ResultadoImportSysacad(
         importadas=importadas,
         omitidas=omitidas,
+        eliminadas=eliminadas,
         errores=errores,
     )

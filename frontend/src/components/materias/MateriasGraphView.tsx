@@ -160,6 +160,7 @@ function computarContadores(
       serverContadores.creditos_electivas + (creditosActual - creditosInicial),
     ),
     meta_creditos_electivas: serverContadores.meta_creditos_electivas,
+    promedio_general: serverContadores.promedio_general,
   };
 }
 
@@ -325,12 +326,9 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
     [nodosEfectivos, grafo.nodos, grafo.contadores],
   );
 
-  // Promedio de notas de materias aprobadas con nota cargada.
-  const promedio = useMemo(() => {
-    const conNota = nodosEfectivos.filter((n) => n.estado === "aprobado" && n.nota != null);
-    if (conNota.length === 0) return null;
-    return conNota.reduce((sum, n) => sum + (n.nota ?? 0), 0) / conNota.length;
-  }, [nodosEfectivos]);
+  // Promedio general (troncales + electivas juntas). Lo calcula el backend para
+  // que sea consistente entre pestañas, no solo sobre las materias del tab actual.
+  const promedio = contadores.promedio_general;
 
   // True si el usuario tiene al menos algún registro cargado.
   const tieneRegistros = contadores.aprobadas > 0 || contadores.regulares > 0 || contadores.cursando > 0;

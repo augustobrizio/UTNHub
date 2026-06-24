@@ -48,6 +48,9 @@ export function ImportarSysacadModal({ usuarioId = 1, onClose, onImportado }: Pr
   const [error, setError] = useState<string | null>(null);
   const [reseteando, setReseteando] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
+  // Por defecto el pegado reemplaza el historial completo (es "tu estado académico actual").
+  // Evita que se acumulen materias de importaciones previas (ej: electivas distintas).
+  const [reemplazar, setReemplazar] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // -------------------------------------------------------------------------
@@ -95,7 +98,7 @@ export function ImportarSysacadModal({ usuarioId = 1, onClose, onImportado }: Pr
     setPaso("confirmando");
     setError(null);
     try {
-      const res = await confirmarImportarSysacad(usuarioId, { items, forzar: true });
+      const res = await confirmarImportarSysacad(usuarioId, { items, forzar: true, reemplazar });
       setResultado(res);
       setPaso("exito");
       onImportado?.();
@@ -282,6 +285,35 @@ export function ImportarSysacadModal({ usuarioId = 1, onClose, onImportado }: Pr
                 </div>
               )}
 
+              {/* Modo de importación: reemplazar vs. agregar */}
+              <button
+                type="button"
+                onClick={() => setReemplazar((v) => !v)}
+                className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                  reemplazar
+                    ? "bg-primary/8 border-primary/30"
+                    : "bg-surface-container-low border-outline-variant/20 hover:border-outline-variant/40"
+                }`}
+              >
+                <span
+                  className={`material-symbols-outlined text-[22px] shrink-0 ${
+                    reemplazar ? "text-primary" : "text-outline"
+                  }`}
+                >
+                  {reemplazar ? "toggle_on" : "toggle_off"}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-semibold text-on-surface">
+                    Reemplazar mi historial actual
+                  </span>
+                  <span className="block text-xs text-on-surface-variant mt-0.5">
+                    {reemplazar
+                      ? "Se borra lo que tengas cargado y queda solo lo de este pegado. Recomendado para no acumular materias viejas."
+                      : "Se agrega/actualiza sobre lo que ya tenés. Puede dejar materias de importaciones anteriores (ej: electivas)."}
+                  </span>
+                </span>
+              </button>
+
               {/* Tabla */}
               <div className="rounded-2xl border border-outline-variant/20 overflow-hidden">
                 <table className="w-full text-xs">
@@ -398,6 +430,11 @@ export function ImportarSysacadModal({ usuarioId = 1, onClose, onImportado }: Pr
                 {resultado.omitidas > 0 && (
                   <p className="text-sm text-on-surface-variant mt-1">
                     {resultado.omitidas} omitida{resultado.omitidas !== 1 ? "s" : ""} (deseleccionadas o sin match)
+                  </p>
+                )}
+                {resultado.eliminadas > 0 && (
+                  <p className="text-sm text-on-surface-variant mt-1">
+                    Se reemplazó tu historial anterior ({resultado.eliminadas} registro{resultado.eliminadas !== 1 ? "s" : ""} previo{resultado.eliminadas !== 1 ? "s" : ""}).
                   </p>
                 )}
               </div>

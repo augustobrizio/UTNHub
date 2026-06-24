@@ -72,6 +72,8 @@ export interface ContadoresGrafo {
   carga_horaria_cursando: number;
   creditos_electivas: number;
   meta_creditos_electivas: number;
+  /** Promedio global (troncales + electivas), igual en ambas pestañas. */
+  promedio_general: number | null;
 }
 
 export interface GrafoResponse {
@@ -130,11 +132,14 @@ export interface PreviewImportSysacad {
 export interface ConfirmarImportIn {
   items: ItemImportMapeado[];
   forzar: boolean;
+  /** Si es true, borra todo el historial previo antes de importar (no acumula). */
+  reemplazar?: boolean;
 }
 
 export interface ResultadoImportSysacad {
   importadas: number;
   omitidas: number;
+  eliminadas: number;
   errores: string[];
 }
 
