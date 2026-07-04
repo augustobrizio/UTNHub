@@ -1,71 +1,67 @@
-"use client";
-
-import { useState } from "react";
-
+/**
+ * Barra superior — lenguaje "Vercel × UTN": canvas neutro real, borders
+ * hairline, acento celeste institucional e isotipo UTN.
+ */
 function UtnLogo() {
-  const [imgOk, setImgOk] = useState(true);
   return (
-    <div className="w-9 h-9 rounded-xl border border-outline-variant/20 flex items-center justify-center overflow-hidden shrink-0 bg-surface-container">
-      {imgOk ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src="/utn-logo.png"
-          alt="UTN"
-          width={30}
-          height={30}
-          className="object-contain invert opacity-80"
-          onError={() => setImgOk(false)}
-        />
-      ) : (
-        <span className="text-[10px] font-black font-headline text-primary tracking-tight leading-none">UTN</span>
-      )}
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#1CA4DF]/25 bg-[#1CA4DF]/10">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/utn-isotipo-white.png"
+        alt="UTN"
+        className="h-5 w-5 object-contain opacity-90"
+      />
     </div>
   );
 }
 
 export function TopNav() {
   return (
-    <nav className="fixed top-0 w-full z-50 h-16 flex items-center gap-4 px-6 bg-surface-container-lowest/90 backdrop-blur-xl border-b border-outline-variant/10">
-
-      {/* Logo + nombre (alineado al inicio) */}
-      <div className="flex items-center gap-3 w-64 shrink-0">
+    <nav className="fixed top-0 z-50 flex h-16 w-full items-center gap-4 border-b border-white/[0.06] bg-[#0a0a0a]/90 px-6 backdrop-blur-xl">
+      {/* Logo + nombre */}
+      <div className="flex w-64 shrink-0 items-center gap-3">
         <UtnLogo />
         <div className="leading-none">
-          <span className="text-[15px] font-black font-headline tracking-tight text-on-surface">UTNHub</span>
-          <p className="text-[9px] text-outline/55 tracking-[0.12em] uppercase font-label mt-0.5">ISI · UTN FRRO</p>
+          <span className="font-headline text-[15px] font-extrabold tracking-tight text-neutral-50">
+            UTNHub
+          </span>
+          <p className="mt-0.5 font-label text-[9px] uppercase tracking-[0.12em] text-neutral-500">
+            ISI · UTN FRRO
+          </p>
         </div>
       </div>
 
-      {/* Search bar — izquierda (después del logo) */}
-      <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-xl border border-outline-variant/15 hover:border-outline-variant/30 transition-colors focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20 w-72">
-        <span className="material-symbols-outlined text-[16px] text-outline shrink-0">search</span>
+      {/* Buscador */}
+      <div className="flex w-72 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 transition-colors hover:border-white/20 focus-within:border-[#1CA4DF]/50 focus-within:ring-1 focus-within:ring-[#1CA4DF]/20">
+        <span className="material-symbols-outlined shrink-0 text-[16px] text-neutral-500">
+          search
+        </span>
         <input
-          className="bg-transparent border-none focus:outline-none text-sm text-on-surface-variant placeholder:text-outline/55 flex-1 min-w-0"
+          className="min-w-0 flex-1 border-none bg-transparent text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none"
           placeholder="Buscar materias, profesores..."
           type="text"
         />
-        <kbd className="hidden lg:inline-flex items-center text-[9px] text-outline/40 border border-outline-variant/20 rounded px-1 py-0.5 font-label shrink-0">
+        <kbd className="hidden shrink-0 items-center rounded border border-white/15 px-1 py-0.5 font-label text-[9px] text-neutral-500 lg:inline-flex">
           ⌘K
         </kbd>
       </div>
 
-      {/* Espaciador */}
       <div className="flex-1" />
 
-      {/* Acciones derecha */}
+      {/* Acciones */}
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="relative w-9 h-9 rounded-xl flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-all"
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-white/[0.05] hover:text-neutral-100"
           aria-label="Notificaciones"
         >
           <span className="material-symbols-outlined text-[20px]">notifications</span>
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-secondary rounded-full border-2 border-surface-container-lowest shadow-[0_0_6px_rgba(125,255,162,0.7)]" />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-[#0a0a0a] bg-[#1CA4DF]" />
         </button>
 
         <button
           type="button"
-          className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-headline font-black text-xs hover:bg-primary/15 transition-colors"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#1CA4DF]/25 bg-[#1CA4DF]/10 font-headline text-xs font-extrabold text-[#4EC0EC] transition-colors hover:bg-[#1CA4DF]/15"
           aria-label="Cuenta"
         >
           JR
