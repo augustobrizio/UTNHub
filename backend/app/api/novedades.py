@@ -40,7 +40,14 @@ def listar_novedades(
         limite=limite,
         offset=offset,
     )
-    return [NovedadOut.model_validate(n) for n in novedades]
+    # Resolvemos la imagen de portada (dedup de placeholders dentro del set).
+    imagenes = novedad_service.resolver_imagenes_portada(novedades)
+    salida: list[NovedadOut] = []
+    for n, imagen_url in zip(novedades, imagenes):
+        dto = NovedadOut.model_validate(n)
+        dto.imagen_url = imagen_url
+        salida.append(dto)
+    return salida
 
 
 @router.get("/{novedad_id}", response_model=NovedadOut)

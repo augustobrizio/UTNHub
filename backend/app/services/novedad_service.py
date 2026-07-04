@@ -18,7 +18,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.ai import clasificador_novedades
+from app.ai import clasificador_novedades, placeholders
 from app.config import get_settings
 from app.db.models.novedad import EstadoIngesta, EstadoNovedad
 from app.repositories import novedad_repo
@@ -130,6 +130,12 @@ def _clasificar_y_persistir(
 
     imagen_path = _guardar_evidencia(crudo)
 
+    # Imagen: la propia del post si la hay; si no, el placeholder que eligió el
+    # LLM (se dedup y resuelve al mostrar la portada).
+    imagen_url = crudo.imagen_url
+    if not imagen_url and clf.imagen_sugerida:
+        imagen_url = placeholders.path_de(clf.imagen_sugerida)
+
     novedad_repo.crear_novedad(
         db,
         external_id=crudo.external_id,
@@ -139,7 +145,7 @@ def _clasificar_y_persistir(
         titulo=clf.titulo,
         descripcion=clf.descripcion,
         categoria=clf.categoria,
-        imagen_url=crudo.imagen_url,
+        imagen_url=imagen_url,
         imagen_path=imagen_path,
         estado=estado,
         confianza=clf.confianza,
@@ -212,6 +218,39 @@ def listar(
         limite=limite,
         offset=offset,
     )
+
+
+def resolver_imagenes_portada(novedades: Sequence) -> list[str | None]:
+    """Resuelve la imagen final de cada novedad para la portada.
+
+    - Imagen propia (URL absoluta): se respeta tal cual.
+    - Placeholder elegido por el LLM: si otra novedad visible ya lo usa, rota
+      al siguiente placeholder libre (arrancando desde su índice, así cae en
+      una imagen parecida). Sin sugerencia: arranca desde las genéricas.
+
+    Devuelve las URLs resueltas en el mismo orden. No muta las novedades.
+    """
+    cat = placeholders.NOMBRES
+    usados: set[str] = set()
+    resueltas: list[str | None] = []
+    for n in novedades:
+        url = getattr(n, "imagen_url", None)
+        if url and not placeholders.es_placeholder(url):
+            resueltas.append(url)  # imagen real del post/nota
+            continue
+        anchor = placeholders.nombre_de(url)
+        inicio = cat.index(anchor) if anchor in cat else placeholders.INDICE_GENERICA
+        elegido: str | None = None
+        for k in range(len(cat)):
+            cand = cat[(inicio + k) % len(cat)]
+            if cand not in usados:
+                elegido = cand
+                break
+        if elegido is None:  # todas en uso: se permite repetir
+            elegido = cat[inicio % len(cat)]
+        usados.add(elegido)
+        resueltas.append(placeholders.path_de(elegido))
+    return resueltas
 
 
 def get(db: Session, novedad_id: int):

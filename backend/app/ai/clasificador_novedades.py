@@ -20,6 +20,7 @@ import base64
 import logging
 from functools import lru_cache
 
+from app.ai import placeholders
 from app.ai.prompts.novedades import CLASIFICADOR_SYSTEM
 from app.config import get_settings
 from app.schemas.novedad import ClasificacionNovedad
@@ -76,6 +77,11 @@ def _build_message(item: NovedadCruda) -> dict:
             "La imagen adjunta es el contenido visual (flyer/story); leé el "
             "texto que aparece dentro de la imagen.\n"
         )
+    instruccion += (
+        "\nImágenes genéricas disponibles (para imagen_sugerida, elegí el "
+        "nombre de archivo que mejor represente la novedad, o null):\n"
+        f"{placeholders.catalogo_para_prompt()}\n"
+    )
     content.append({"type": "text", "text": instruccion})
 
     if usar_imagen:
@@ -103,6 +109,12 @@ def clasificar(item: NovedadCruda) -> ResultadoClasificacion:
     # Con include_raw=True el retorno es {"raw": AIMessage, "parsed": Modelo,
     # "parsing_error": ...}. Usamos raw para extraer el uso de tokens.
     clasificacion: ClasificacionNovedad = resultado["parsed"]
+
+    # El LLM a veces devuelve un nombre que no está en el catálogo: lo anulamos
+    # para no guardar una ruta rota.
+    if clasificacion.imagen_sugerida not in placeholders.NOMBRES:
+        clasificacion.imagen_sugerida = None
+
     raw = resultado.get("raw")
     tokens = 0
     if raw is not None and getattr(raw, "usage_metadata", None):

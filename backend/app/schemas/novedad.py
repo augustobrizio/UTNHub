@@ -50,6 +50,14 @@ class ClasificacionNovedad(BaseModel):
         default=None,
         description="Si es_novedad=False, breve motivo del descarte.",
     )
+    imagen_sugerida: str | None = Field(
+        default=None,
+        description=(
+            "Nombre EXACTO de archivo, de la lista de imágenes genéricas "
+            "provista, que mejor representa esta novedad. null si ninguna "
+            "encaja. Se usa solo si la novedad no tiene imagen propia."
+        ),
+    )
 
 
 class NovedadOut(BaseModel):

@@ -87,8 +87,8 @@ def listar(
         stmt = stmt.where(Novedad.categoria == categoria)
     if estado is not None:
         stmt = stmt.where(Novedad.estado == estado)
+    # Orden por fecha de ingesta (created_at): a futuro ingesta ~= publicación.
     stmt = stmt.order_by(
-        Novedad.fecha_publicacion.desc().nullslast(),
         Novedad.created_at.desc().nullslast(),
         Novedad.id.desc(),
     )

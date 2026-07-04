@@ -1,37 +1,16 @@
-import Link from "next/link";
-
 import { NovedadCard } from "@/features/novedades/NovedadCard";
 import { listarNovedades } from "@/lib/api";
-import type { CategoriaNovedad, NovedadOut } from "@/lib/types";
+import type { NovedadOut } from "@/lib/types";
 
-const FILTROS: Array<{ value: CategoriaNovedad | "todos"; label: string }> = [
-  { value: "todos", label: "Todas" },
-  { value: "aviso", label: "Avisos" },
-  { value: "evento", label: "Eventos" },
-  { value: "noticia", label: "Noticias" },
-  { value: "general", label: "General" },
-];
+// Cuantas novedades entran en la portada (numero generico por ahora). Tambien
+// define la ventana de dedup de placeholders en el backend.
+const PORTADA_LIMITE = 12;
 
-type Search = { categoria?: string };
-
-function normalizarCategoria(v?: string): CategoriaNovedad | undefined {
-  return v === "aviso" || v === "evento" || v === "noticia" || v === "general"
-    ? v
-    : undefined;
-}
-
-export default async function NovedadesPage({
-  searchParams,
-}: {
-  searchParams?: Promise<Search>;
-}) {
-  const params = (await searchParams) ?? {};
-  const categoria = normalizarCategoria(params.categoria);
-
+export default async function NovedadesPage() {
   let novedades: NovedadOut[] = [];
   let error = false;
   try {
-    novedades = await listarNovedades({ categoria, limite: 30 });
+    novedades = await listarNovedades({ limite: PORTADA_LIMITE });
   } catch {
     error = true;
   }
@@ -41,12 +20,12 @@ export default async function NovedadesPage({
       {/* Hero con identidad UTN: wash celeste + isotipo difuminado + membrete */}
       <header className="relative overflow-hidden border-b border-white/[0.06]">
         <div aria-hidden className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_88%_-20%,rgba(28,164,223,0.16),transparent_55%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_88%_-10%,rgba(28,164,223,0.16),transparent_55%)]" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/utn-isotipo-white.png"
             alt=""
-            className="absolute -right-4 -top-12 w-[280px] select-none opacity-[0.05] blur-[1px]"
+            className="absolute -right-4 top-8 w-[280px] select-none opacity-[0.05] blur-[1px]"
           />
         </div>
 
@@ -81,29 +60,6 @@ export default async function NovedadesPage({
 
       {/* Contenido */}
       <div className="mx-auto max-w-6xl px-8 py-9">
-        <nav className="mb-8 flex flex-wrap gap-2">
-          {FILTROS.map((f) => {
-            const activo =
-              f.value === "todos" ? categoria === undefined : categoria === f.value;
-            const href =
-              f.value === "todos" ? "/novedades" : `/novedades?categoria=${f.value}`;
-            return (
-              <Link
-                key={f.value}
-                href={href}
-                className={[
-                  "rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-150",
-                  activo
-                    ? "border-[#1CA4DF]/40 bg-[#1CA4DF]/10 text-[#4EC0EC]"
-                    : "border-white/[0.07] text-neutral-400 hover:border-white/20 hover:text-neutral-200",
-                ].join(" ")}
-              >
-                {f.label}
-              </Link>
-            );
-          })}
-        </nav>
-
         {error ? (
           <EstadoVacio
             icono="cloud_off"
