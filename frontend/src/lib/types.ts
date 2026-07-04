@@ -164,3 +164,26 @@ export interface ResultadoSincCalendario {
   advertencias: string[];
   errores: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Novedades - refleja `app/schemas/novedad.py`
+// ---------------------------------------------------------------------------
+
+export type CategoriaNovedad = "evento" | "aviso" | "noticia" | "general";
+export type FuenteNovedad = "instagram" | "utn_web";
+export type EstadoNovedad = "publicada" | "pendiente" | "descartada";
+
+export interface NovedadOut {
+  id: number;
+  fuente: FuenteNovedad | null;
+  origen: string | null;
+  titulo: string | null;
+  descripcion: string | null;
+  url: string | null;
+  imagen_url: string | null;
+  categoria: CategoriaNovedad | string | null;
+  estado: EstadoNovedad;
+  confianza: number | null;
+  fecha_publicacion: string | null;
+  created_at: string | null;
+}

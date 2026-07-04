@@ -1,0 +1,86 @@
+"""Endpoints REST de novedades."""
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.schemas.novedad import (
+    CategoriaNovedadLiteral,
+    EstadoNovedadLiteral,
+    FuenteNovedadLiteral,
+    ModerarNovedadIn,
+    NovedadOut,
+    ResultadoIngesta,
+)
+from app.services import novedad_service
+
+router = APIRouter(prefix="/novedades", tags=["novedades"])
+
+
+@router.get("", response_model=list[NovedadOut])
+def listar_novedades(
+    db: Annotated[Session, Depends(get_db)],
+    fuente: FuenteNovedadLiteral | None = Query(None),
+    categoria: CategoriaNovedadLiteral | None = Query(None),
+    estado: EstadoNovedadLiteral | None = Query(
+        "publicada", description="Filtra por estado; None trae todos (admin)"
+    ),
+    limite: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> list[NovedadOut]:
+    """Feed de novedades. Por defecto solo las publicadas."""
+    novedades = novedad_service.listar(
+        db,
+        fuente=fuente,
+        categoria=categoria,
+        estado=estado,
+        limite=limite,
+        offset=offset,
+    )
+    return [NovedadOut.model_validate(n) for n in novedades]
+
+
+@router.get("/{novedad_id}", response_model=NovedadOut)
+def get_novedad(
+    novedad_id: int,
+    db: Annotated[Session, Depends(get_db)],
+) -> NovedadOut:
+    """Detalle de una novedad por ID."""
+    novedad = novedad_service.get(db, novedad_id)
+    if novedad is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Novedad {novedad_id} no encontrada.",
+        )
+    return NovedadOut.model_validate(novedad)
+
+
+@router.patch("/{novedad_id}/moderar", response_model=NovedadOut)
+def moderar_novedad(
+    novedad_id: int,
+    body: ModerarNovedadIn,
+    db: Annotated[Session, Depends(get_db)],
+) -> NovedadOut:
+    """Aprueba (publica) o descarta una novedad pendiente de moderación."""
+    novedad = novedad_service.moderar(db, novedad_id, body.estado)
+    if novedad is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Novedad {novedad_id} no encontrada.",
+        )
+    return NovedadOut.model_validate(novedad)
+
+
+@router.post(
+    "/sincronizar",
+    response_model=ResultadoIngesta,
+    summary="Dispara la ingesta de novedades desde las fuentes configuradas",
+)
+def sincronizar_novedades(
+    db: Annotated[Session, Depends(get_db)],
+) -> ResultadoIngesta:
+    """Ejecuta el pipeline de ingesta on-demand (mismo callable que el scheduler)."""
+    return novedad_service.run_ingesta_novedades(db)
