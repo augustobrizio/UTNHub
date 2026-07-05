@@ -11,6 +11,7 @@ import type {
   TipoMateria,
 } from "@/lib/types";
 import { registrarEstado, eliminarEstado } from "@/lib/api";
+import { materiaIcon } from "@/lib/materiaIcon";
 import { GrafoCanvas } from "./GrafoCanvas";
 import { HeaderStats } from "./HeaderStats";
 import { Filtros } from "./Filtros";
@@ -159,6 +160,7 @@ function computarContadores(
       serverContadores.creditos_electivas + (creditosActual - creditosInicial),
     ),
     meta_creditos_electivas: serverContadores.meta_creditos_electivas,
+    promedio_general: serverContadores.promedio_general,
   };
 }
 
@@ -324,12 +326,9 @@ export function MateriasGraphView({ grafo, tipo }: Props) {
     [nodosEfectivos, grafo.nodos, grafo.contadores],
   );
 
-  // Promedio de notas de materias aprobadas con nota cargada.
-  const promedio = useMemo(() => {
-    const conNota = nodosEfectivos.filter((n) => n.estado === "aprobado" && n.nota != null);
-    if (conNota.length === 0) return null;
-    return conNota.reduce((sum, n) => sum + (n.nota ?? 0), 0) / conNota.length;
-  }, [nodosEfectivos]);
+  // Promedio general (troncales + electivas juntas). Lo calcula el backend para
+  // que sea consistente entre pestañas, no solo sobre las materias del tab actual.
+  const promedio = contadores.promedio_general;
 
   // True si el usuario tiene al menos algún registro cargado.
   const tieneRegistros = contadores.aprobadas > 0 || contadores.regulares > 0 || contadores.cursando > 0;
@@ -601,11 +600,20 @@ function MateriaModal({
             </div>
           </div>
 
-          {/* Fila 2: título */}
-          <h2 className="text-xl font-headline font-extrabold text-on-surface leading-tight">
-            {nodo.nombre}
-          </h2>
-          <p className="text-[10px] text-outline/60 font-label mt-1">{nodo.codigo}</p>
+          {/* Fila 2: ícono + título */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[22px] text-primary">
+                {materiaIcon(nodo.nombre)}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-xl font-headline font-extrabold text-on-surface leading-tight">
+                {nodo.nombre}
+              </h2>
+              <p className="text-[10px] text-outline/60 font-label mt-0.5">{nodo.codigo}</p>
+            </div>
+          </div>
         </div>
 
         {/* Cuerpo scrolleable */}

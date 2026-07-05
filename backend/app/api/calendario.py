@@ -9,13 +9,79 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.calendario import (
+    EventoCalendarioCreate,
     EventoCalendarioOut,
+    EventoCalendarioUpdate,
     ResultadoSincCalendario,
     TipoEventoLiteral,
 )
 from app.services import calendario_service
 
 router = APIRouter(prefix="/calendario", tags=["calendario"])
+
+
+@router.post(
+    "/eventos",
+    response_model=EventoCalendarioOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear un evento propio del alumno",
+)
+def crear_evento(
+    payload: EventoCalendarioCreate,
+    db: Annotated[Session, Depends(get_db)],
+) -> EventoCalendarioOut:
+    evento = calendario_service.crear_evento_usuario(
+        db,
+        titulo=payload.titulo,
+        descripcion=payload.descripcion,
+        fecha_inicio=payload.fecha_inicio,
+        fecha_fin=payload.fecha_fin,
+        tipo=payload.tipo,
+    )
+    db.commit()
+    db.refresh(evento)
+    return EventoCalendarioOut.model_validate(evento)
+
+
+@router.put(
+    "/eventos/{evento_id}",
+    response_model=EventoCalendarioOut,
+    summary="Editar un evento propio del alumno",
+)
+def actualizar_evento(
+    evento_id: int,
+    payload: EventoCalendarioUpdate,
+    db: Annotated[Session, Depends(get_db)],
+) -> EventoCalendarioOut:
+    try:
+        evento = calendario_service.actualizar_evento_usuario(
+            db, evento_id, payload.model_dump(exclude_unset=True)
+        )
+        db.commit()
+        db.refresh(evento)
+    except ValueError as e:
+        if str(e) == "no_encontrado":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evento no encontrado.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ese evento no se puede editar.")
+    return EventoCalendarioOut.model_validate(evento)
+
+
+@router.delete(
+    "/eventos/{evento_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Borrar un evento propio del alumno",
+)
+def eliminar_evento(
+    evento_id: int,
+    db: Annotated[Session, Depends(get_db)],
+) -> None:
+    ok = calendario_service.eliminar_evento_usuario(db, evento_id)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Evento no encontrado o no editable.",
+        )
+    db.commit()
 
 
 @router.get("", response_model=list[EventoCalendarioOut])

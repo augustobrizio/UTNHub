@@ -1,4 +1,5 @@
 import type { CorrelativaEdge, MateriaNodo } from "@/lib/types";
+import { materiaIcon } from "@/lib/materiaIcon";
 import { cuatriLabel } from "./layout";
 
 const ANIO_ORD: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
@@ -39,14 +40,23 @@ export function MateriaDetallePanel({ nodo, edges, todosLosNodos, onClose }: Pro
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          <p className="text-[10px] uppercase tracking-widest font-bold text-outline mb-1 font-label">
-            {nodo.codigo}
-            {anioLabel && ` · ${anioLabel}`}
-            {cuatriLabelStr && ` · ${cuatriLabelStr}`}
-          </p>
-          <h3 className="text-2xl font-headline font-extrabold text-on-surface mb-4">
-            {nodo.nombre}
-          </h3>
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-[22px] text-primary">
+                {materiaIcon(nodo.nombre)}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-outline mb-1 font-label">
+                {nodo.codigo}
+                {anioLabel && ` · ${anioLabel}`}
+                {cuatriLabelStr && ` · ${cuatriLabelStr}`}
+              </p>
+              <h3 className="text-2xl font-headline font-extrabold text-on-surface leading-tight">
+                {nodo.nombre}
+              </h3>
+            </div>
+          </div>
           <div className="flex items-center gap-2 mb-3">
             <EstadoBadge estado={nodo.estado} />
             {nodo.nota != null && (

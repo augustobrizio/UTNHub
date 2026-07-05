@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import calendario, materias, novedades, profesores, usuario_materia
+from app.api import calendario, comisiones, materias, novedades, profesores, usuario_materia
 from app.workers import scheduler as scheduler_mod
 
 
@@ -41,6 +41,7 @@ app.include_router(profesores.router)
 app.include_router(usuario_materia.router)
 app.include_router(calendario.router)
 app.include_router(novedades.router)
+app.include_router(comisiones.router)
 
 
 @app.get("/health")

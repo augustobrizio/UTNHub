@@ -72,6 +72,8 @@ export interface ContadoresGrafo {
   carga_horaria_cursando: number;
   creditos_electivas: number;
   meta_creditos_electivas: number;
+  /** Promedio global (troncales + electivas), igual en ambas pestañas. */
+  promedio_general: number | null;
 }
 
 export interface GrafoResponse {
@@ -130,19 +132,76 @@ export interface PreviewImportSysacad {
 export interface ConfirmarImportIn {
   items: ItemImportMapeado[];
   forzar: boolean;
+  /** Si es true, borra todo el historial previo antes de importar (no acumula). */
+  reemplazar?: boolean;
 }
 
 export interface ResultadoImportSysacad {
   importadas: number;
   omitidas: number;
+  eliminadas: number;
   errores: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Horarios / comisiones — refleja `app/schemas/comision.py`
+// ---------------------------------------------------------------------------
+
+export interface HorarioOut {
+  dia: string | null;
+  hora_inicio: string | null; // "HH:MM:SS"
+  hora_fin: string | null;    // "HH:MM:SS"
+  aula: string | null;
+}
+
+export interface ComisionCursadaOut {
+  comision_id: number;
+  comision_nombre: string | null;
+  cursada_id: number;
+  docente: string | null;
+  horarios: HorarioOut[];
+}
+
+export interface MateriaCursableOut {
+  materia_codigo: string;
+  materia_nombre: string;
+  anio_carrera: number | null;
+  es_anual: boolean;
+  cursada_seleccionada_id: number | null;
+  comisiones: ComisionCursadaOut[];
+}
+
+// Optimizador de horarios
+export type CriterioOptimizacion = "huecos" | "dias" | "turno";
+export type TurnoPref = "manana" | "tarde" | "noche";
+
+export interface AsignacionOut {
+  materia_codigo: string;
+  materia_nombre: string;
+  comision_id: number;
+  comision_nombre: string | null;
+  cursada_id: number;
+  horarios: HorarioOut[];
+}
+
+export interface OptimizacionOut {
+  ok: boolean;
+  motivo: string | null;
+  criterio: CriterioOptimizacion;
+  total_huecos_min: number;
+  dias_usados: number;
+  combinaciones_evaluadas: number;
+  materias_sin_comision: string[];
+  asignaciones: AsignacionOut[];
+  dia_libre_ok: boolean;
+  dias_libres_posibles: string[];
 }
 
 // ---------------------------------------------------------------------------
 // Calendario academico - refleja `app/schemas/calendario.py`
 // ---------------------------------------------------------------------------
 
-export type TipoEventoCalendario = "examen" | "inscripcion" | "feriado" | "evento";
+export type TipoEventoCalendario = "examen" | "mesa" | "trabajo_practico" | "feriado" | "evento";
 
 export interface EventoCalendarioOut {
   id: number;
@@ -153,6 +212,15 @@ export interface EventoCalendarioOut {
   tipo: TipoEventoCalendario;
   carrera: string | null;
   fuente_url: string | null;
+  origen: string; // "sistema" | "usuario"
+}
+
+export interface EventoCalendarioCreate {
+  titulo: string;
+  descripcion?: string | null;
+  fecha_inicio: string;
+  fecha_fin?: string | null;
+  tipo: TipoEventoCalendario;
 }
 
 export interface ResultadoSincCalendario {

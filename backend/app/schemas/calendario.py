@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-TipoEventoLiteral = Literal["examen", "inscripcion", "feriado", "evento"]
+TipoEventoLiteral = Literal["examen", "mesa", "trabajo_practico", "feriado", "evento"]
 
 
 class EventoCalendarioOut(BaseModel):
@@ -20,8 +20,29 @@ class EventoCalendarioOut(BaseModel):
     tipo: TipoEventoLiteral
     carrera: str | None = None
     fuente_url: str | None = None
+    origen: str = "sistema"
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class EventoCalendarioCreate(BaseModel):
+    """Alta de un evento creado por el alumno."""
+
+    titulo: str = Field(min_length=1, max_length=200)
+    descripcion: str | None = None
+    fecha_inicio: datetime
+    fecha_fin: datetime | None = None
+    tipo: TipoEventoLiteral = "examen"
+
+
+class EventoCalendarioUpdate(BaseModel):
+    """Edición de un evento del alumno (todos los campos opcionales)."""
+
+    titulo: str | None = Field(default=None, min_length=1, max_length=200)
+    descripcion: str | None = None
+    fecha_inicio: datetime | None = None
+    fecha_fin: datetime | None = None
+    tipo: TipoEventoLiteral | None = None
 
 
 class ResultadoSincCalendario(BaseModel):

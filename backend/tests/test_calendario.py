@@ -68,7 +68,8 @@ def test_parsear_texto_eventos_clasifica_y_deduplica() -> None:
     assert len(eventos) == 2
     assert eventos[0].tipo == "feriado"
     assert eventos[0].fecha_inicio == datetime(2026, 5, 25)
-    assert eventos[1].tipo == "inscripcion"
+    # Las inscripciones ahora se clasifican como eventos institucionales.
+    assert eventos[1].tipo == "evento"
     assert eventos[1].fecha_fin == datetime(2026, 6, 4)
 
 
@@ -123,7 +124,7 @@ def test_listar_eventos_incluye_eventos_que_se_solapan_con_rango() -> None:
         descripcion=None,
         fecha_inicio=datetime(2026, 5, 4),
         fecha_fin=datetime(2026, 9, 11),
-        tipo="inscripcion",
+        tipo="evento",
         carrera="ISI",
         fuente_url=None,
         content_hash="equivalencias",

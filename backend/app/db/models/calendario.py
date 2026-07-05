@@ -19,7 +19,8 @@ class TipoEventoCalendario(str, enum.Enum):
     """Tipos publicos del calendario v1."""
 
     EXAMEN = "examen"
-    INSCRIPCION = "inscripcion"
+    MESA = "mesa"
+    TRABAJO_PRACTICO = "trabajo_practico"
     FERIADO = "feriado"
     EVENTO = "evento"
 
@@ -41,6 +42,10 @@ class EventoCalendario(Base):
     carrera: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     fuente_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # "sistema" (scrapeado de FRRO) o "usuario" (creado por el alumno).
+    origen: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="sistema", index=True
+    )
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now()
     )

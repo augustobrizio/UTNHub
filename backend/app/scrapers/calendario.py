@@ -134,7 +134,7 @@ def parsear_pdf(
         return _eventos_calendario_isi_2026_2027(fuente_url, carrera)
 
     # Fallback para PDFs de ternas que publican solo dia de semana/hora.
-    if tipo_preferido == "examen" or "ternas" in fuente_url.lower():
+    if tipo_preferido == "mesa" or "ternas" in fuente_url.lower():
         fecha = _inferir_fecha_desde_url(fuente_url) or datetime.now().replace(
             hour=0, minute=0, second=0, microsecond=0
         )
@@ -145,7 +145,7 @@ def parsear_pdf(
                 descripcion=resumen,
                 fecha_inicio=fecha,
                 fecha_fin=None,
-                tipo="examen",
+                tipo="mesa",
                 carrera=carrera,
                 fuente_url=fuente_url,
             )
@@ -218,10 +218,13 @@ def _clasificar_tipo(linea: str) -> str:
     lower = linea.lower()
     if any(p in lower for p in ("feriado", "asueto", "sin actividad")):
         return "feriado"
+    # Las inscripciones se tratan como eventos institucionales (antes que 'examen'
+    # para que "inscripción a finales" no caiga en examen por la palabra "final").
     if any(p in lower for p in ("inscrip", "preinscrip")):
-        return "inscripcion"
+        return "evento"
+    # Mesas de examen institucionales (no son "el examen del alumno").
     if any(p in lower for p in ("examen", "mesa", "final", "parcial")):
-        return "examen"
+        return "mesa"
     return "evento"
 
 
@@ -443,7 +446,7 @@ def _eventos_calendario_isi_2026_2027(
         ("2027-02-22", "2027-02-26"),
         ("2027-03-08", "2027-03-12"),
     ):
-        add("Mesa de Examen", inicio, "examen", "Fecha de mesa de examen.", fin)
+        add("Mesa de Examen", inicio, "mesa", "Fecha de mesa de examen.", fin)
 
     for inicio, fin in (
         ("2026-06-22", "2026-06-26"),
@@ -452,7 +455,7 @@ def _eventos_calendario_isi_2026_2027(
         add(
             "Mesa Especial",
             inicio,
-            "examen",
+            "mesa",
             "Mesa especial. La inscripcion se confirma por Legajos y Actas.",
             fin,
         )
@@ -501,21 +504,21 @@ def _eventos_calendario_isi_2026_2027(
     add(
         "Inscripcion a materias anuales y del 1er Cuatrimestre",
         "2026-03-02",
-        "inscripcion",
+        "evento",
         "Periodo de inscripcion a materias anuales y del 1er cuatrimestre.",
         "2026-03-16",
     )
     add(
         "Inscripcion a materias del 2do Cuatrimestre",
         "2026-07-06",
-        "inscripcion",
+        "evento",
         "Periodo de inscripcion a materias del 2do cuatrimestre.",
         "2026-07-20",
     )
     add(
         "Inscripcion por Equivalencias",
         "2026-05-04",
-        "inscripcion",
+        "evento",
         "Periodo de inscripcion por equivalencias.",
         "2026-09-11",
     )

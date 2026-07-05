@@ -1,3 +1,7 @@
+"use client";
+
+import { useSidebar } from "./SidebarContext";
+
 /**
  * Barra superior — lenguaje "Vercel × UTN": canvas neutro real, borders
  * hairline, acento celeste institucional e isotipo UTN.
@@ -16,19 +20,24 @@ function UtnLogo() {
 }
 
 export function TopNav() {
+  const { collapsed } = useSidebar();
   return (
     <nav className="fixed top-0 z-50 flex h-16 w-full items-center gap-4 border-b border-white/[0.06] bg-[#0a0a0a]/90 px-6 backdrop-blur-xl">
-      {/* Logo + nombre */}
-      <div className="flex w-64 shrink-0 items-center gap-3">
+      {/* Logo + nombre — ancho alineado con la sidebar */}
+      <div
+        className={`flex shrink-0 items-center gap-3 transition-[width] duration-200 ease-out ${collapsed ? "w-9" : "w-56"}`}
+      >
         <UtnLogo />
-        <div className="leading-none">
-          <span className="font-headline text-[15px] font-extrabold tracking-tight text-neutral-50">
-            UTNHub
-          </span>
-          <p className="mt-0.5 font-label text-[9px] uppercase tracking-[0.12em] text-neutral-500">
-            ISI · UTN FRRO
-          </p>
-        </div>
+        {!collapsed && (
+          <div className="leading-none">
+            <span className="font-headline text-[15px] font-extrabold tracking-tight text-neutral-50">
+              UTNHub
+            </span>
+            <p className="mt-0.5 font-label text-[9px] uppercase tracking-[0.12em] text-neutral-500">
+              ISI · UTN FRRO
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Buscador */}
