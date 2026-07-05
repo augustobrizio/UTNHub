@@ -69,8 +69,16 @@ class InstagramFuente:
         client.dump_settings(session_path)
         return client
 
+    def _user_id(self, client, handle: str) -> str:
+        # El lookup público (web_profile_info) es el que más rate-limita;
+        # probamos primero la API privada (misma sesión autenticada).
+        try:
+            return str(client.user_info_by_username_v1(handle).pk)
+        except Exception:  # noqa: BLE001
+            return client.user_id_from_username(handle)
+
     def _fetch_handle(self, client, handle: str) -> list[NovedadCruda]:
-        user_id = client.user_id_from_username(handle)
+        user_id = self._user_id(client, handle)
         items: list[NovedadCruda] = []
 
         for media in client.user_medias(user_id, POSTS_POR_HANDLE):
