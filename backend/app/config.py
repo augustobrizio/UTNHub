@@ -46,6 +46,15 @@ class Settings(BaseSettings):
 
     utn_novedades_url: str | None = Field(default=None, alias="UTN_NOVEDADES_URL")
 
+    # S3: copia propia de las imágenes de novedades (las URLs de origen, ej.
+    # CDN de Instagram, expiran). Si no está configurado, cae a disco local.
+    aws_access_key_id: str | None = Field(default=None, alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: str | None = Field(
+        default=None, alias="AWS_SECRET_ACCESS_KEY"
+    )
+    aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
+    aws_s3_bucket: str | None = Field(default=None, alias="AWS_S3_BUCKET")
+
     # Scheduler in-process (desactivable en serverless). Intervalo por fuente (RNF-07).
     scheduler_enabled: bool = Field(default=False, alias="SCHEDULER_ENABLED")
     ingesta_instagram_horas: int = Field(default=6, alias="INGESTA_INSTAGRAM_HORAS")

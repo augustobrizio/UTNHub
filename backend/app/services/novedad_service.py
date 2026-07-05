@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.ai import clasificador_novedades, placeholders
 from app.config import get_settings
+from app.core import storage
 from app.db.models.novedad import EstadoIngesta, EstadoNovedad
 from app.db.models.novedad import FuenteNovedad as FuenteNovedadEnum
 from app.repositories import novedad_repo
@@ -143,14 +144,15 @@ def _clasificar_y_persistir(
     if clf.es_novedad and clf.duplicado_de is not None:
         existente = next((n for n in recientes if n.id == clf.duplicado_de), None)
         if existente is not None:
+            imagen_path = _guardar_evidencia(crudo)
             novedad_repo.agregar_fuente(
                 db,
                 novedad=existente,
                 centro=_resolver_centro(db, crudo),
                 external_id=crudo.external_id,
                 url=crudo.url,
-                imagen_url=crudo.imagen_url,
-                imagen_path=_guardar_evidencia(crudo),
+                imagen_url=imagen_path or crudo.imagen_url,
+                imagen_path=imagen_path,
                 fecha_publicacion=crudo.fecha_publicacion,
             )
             res.items_duplicados += 1
@@ -167,8 +169,9 @@ def _clasificar_y_persistir(
         res.items_novedad += 1
 
     imagen_path = _guardar_evidencia(crudo)
-    # Portada: imagen propia del post o, si no hay, el placeholder del LLM.
-    imagen_url = crudo.imagen_url
+    # Portada: nuestra copia (S3/disco) si se pudo subir, si no la de origen
+    # (puede expirar), si no hay ninguna el placeholder del LLM.
+    imagen_url = imagen_path or crudo.imagen_url
     if not imagen_url and clf.imagen_sugerida:
         imagen_url = placeholders.path_de(clf.imagen_sugerida)
 
@@ -177,7 +180,7 @@ def _clasificar_y_persistir(
         centro=_resolver_centro(db, crudo),
         external_id=crudo.external_id,
         fuente_url=crudo.url,
-        fuente_imagen_url=crudo.imagen_url,
+        fuente_imagen_url=imagen_path or crudo.imagen_url,
         fuente_imagen_path=imagen_path,
         titulo=clf.titulo,
         descripcion=clf.descripcion,
@@ -209,16 +212,28 @@ def _resolver_centro(db: Session, crudo: NovedadCruda):
 
 
 def _guardar_evidencia(crudo: NovedadCruda) -> str | None:
-    """Guarda la imagen descargada como evidencia (cita de stories, RF-06)."""
+    """Guarda la imagen descargada como evidencia (cita de stories, RF-06) y
+    copia propia para mostrar (las URLs de origen, ej. CDN de Instagram,
+    expiran). Sube a S3 si está configurado; si no, cae a disco local (dev).
+    """
     if not crudo.imagen_bytes:
         return None
-    settings = get_settings()
-    media_dir = Path(settings.novedades_media_dir)
-    media_dir.mkdir(parents=True, exist_ok=True)
     nombre = crudo.external_id.replace(":", "_").replace("/", "_")
     ext = "jpg"
     if crudo.imagen_mime and "/" in crudo.imagen_mime:
         ext = crudo.imagen_mime.split("/")[-1]
+
+    url_s3 = storage.subir(
+        crudo.imagen_bytes,
+        f"novedades/{nombre}.{ext}",
+        content_type=crudo.imagen_mime or "image/jpeg",
+    )
+    if url_s3 is not None:
+        return url_s3
+
+    settings = get_settings()
+    media_dir = Path(settings.novedades_media_dir)
+    media_dir.mkdir(parents=True, exist_ok=True)
     destino = media_dir / f"{nombre}.{ext}"
     try:
         destino.write_bytes(crudo.imagen_bytes)
