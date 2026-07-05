@@ -30,25 +30,25 @@ CENTROS_CONOCIDOS: dict[str, dict] = {
         "nombre": "UTN Alumnos FRRO",
         "tipo": "instagram",
         "url_perfil": "https://www.instagram.com/utnalumnosfrro/",
-        "logo_url": None,
+        "logo_url": "/novedades/fuentes/utnalumnosfrro.jpg",
     },
     "puebloyreforma": {
         "nombre": "Pueblo y Reforma",
         "tipo": "instagram",
         "url_perfil": "https://www.instagram.com/puebloyreforma/",
-        "logo_url": None,
+        "logo_url": "/novedades/fuentes/puebloyreforma.jpg",
     },
     "gradienteutn": {
         "nombre": "Gradiente UTN",
         "tipo": "instagram",
         "url_perfil": "https://www.instagram.com/gradienteutn/",
-        "logo_url": None,
+        "logo_url": "/novedades/fuentes/gradienteutn.jpg",
     },
     "sauutnrosario": {
         "nombre": "SAU UTN Rosario",
         "tipo": "instagram",
         "url_perfil": "https://www.instagram.com/sauutnrosario/",
-        "logo_url": None,
+        "logo_url": "/novedades/fuentes/sauutnrosario.jpg",
     },
 }
 

@@ -63,12 +63,12 @@ export function NovedadCard({ novedad }: { novedad: NovedadOut }) {
 
           <CardFooter className="mt-4 border-t border-white/[0.05]">
             {centro?.logo_url ? (
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06]">
+              <span className="flex h-4 w-4 shrink-0 overflow-hidden rounded-full bg-white/[0.06]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={centro.logo_url}
                   alt=""
-                  className="h-3 w-3 object-contain"
+                  className="h-full w-full object-cover"
                 />
               </span>
             ) : (
