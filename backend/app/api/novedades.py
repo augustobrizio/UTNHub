@@ -10,7 +10,6 @@ from app.db.session import get_db
 from app.schemas.novedad import (
     CategoriaNovedadLiteral,
     EstadoNovedadLiteral,
-    FuenteNovedadLiteral,
     ModerarNovedadIn,
     NovedadOut,
     ResultadoIngesta,
@@ -23,7 +22,6 @@ router = APIRouter(prefix="/novedades", tags=["novedades"])
 @router.get("", response_model=list[NovedadOut])
 def listar_novedades(
     db: Annotated[Session, Depends(get_db)],
-    fuente: FuenteNovedadLiteral | None = Query(None),
     categoria: CategoriaNovedadLiteral | None = Query(None),
     estado: EstadoNovedadLiteral | None = Query(
         "publicada", description="Filtra por estado; None trae todos (admin)"
@@ -34,7 +32,6 @@ def listar_novedades(
     """Feed de novedades. Por defecto solo las publicadas."""
     novedades = novedad_service.listar(
         db,
-        fuente=fuente,
         categoria=categoria,
         estado=estado,
         limite=limite,

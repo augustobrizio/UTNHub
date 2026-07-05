@@ -1,17 +1,7 @@
-"""Fuente de novedades: Instagram de centros de estudiantes.
+"""Fuente de novedades: Instagram (instagrapi) — posts + stories de los centros.
 
-Usa ``instagrapi`` (API privada no oficial) con una cuenta bot dedicada. La
-sesión se persiste en disco y se reusa entre corridas para no re-loguear cada
-vez (cada login fresco aumenta el riesgo de que IG flaguee la cuenta).
-
-Trae POSTS recientes y STORIES vigentes de cada handle configurado. Para cada
-item descarga la imagen (flyer) y la entrega como ``imagen_bytes`` para que el
-clasificador IA lea el texto embebido — clave en stories, que casi nunca traen
-caption.
-
-Es deliberadamente tolerante a fallos: si un handle o un item falla, se omite
-y se sigue; los errores de login (no recuperables) se propagan para que el
-service los registre en ``ingesta_log``.
+Reusa la sesión persistida en disco y descarga la imagen de cada item para
+visión. Tolerante a fallos por handle/item.
 """
 from __future__ import annotations
 
@@ -32,8 +22,6 @@ POSTS_POR_HANDLE = 12
 
 
 class InstagramFuente:
-    """Scraper de posts + stories de los centros de estudiantes."""
-
     nombre = FuenteNovedadEnum.INSTAGRAM.value
 
     def fetch_recientes(self) -> Sequence[NovedadCruda]:
@@ -51,22 +39,36 @@ class InstagramFuente:
                 logger.exception("Fallo trayendo contenido de @%s", handle)
         return items
 
-    # --- Login con sesión reusada -------------------------------------------
     def _login(self):
         from instagrapi import Client
 
         settings = get_settings()
         client = Client()
+        client.delay_range = [1, 3]
         session_path = Path(settings.instagram_session_path)
+
+        # Sesión dumpeada: se reusa directo (validarla con un request público
+        # entra en loop de redirects si la IP está flagueada). Para re-auth,
+        # borrar el archivo de sesión.
         if session_path.exists():
             client.load_settings(session_path)
-        client.login(settings.instagram_usuario, settings.instagram_password)
-        # Persistir settings actualizados (tokens rotados, etc.).
+            return client
+
+        # sessionid de un browser evita login/challenge/IP-block; password es fallback frágil.
+        if settings.instagram_sessionid:
+            client.login_by_sessionid(settings.instagram_sessionid)
+        elif settings.instagram_usuario and settings.instagram_password:
+            client.login(settings.instagram_usuario, settings.instagram_password)
+        else:
+            raise RuntimeError(
+                "Sin credenciales de Instagram: configurá INSTAGRAM_SESSIONID "
+                "(recomendado) o INSTAGRAM_USUARIO/PASSWORD."
+            )
+
         session_path.parent.mkdir(parents=True, exist_ok=True)
         client.dump_settings(session_path)
         return client
 
-    # --- Fetch por handle ----------------------------------------------------
     def _fetch_handle(self, client, handle: str) -> list[NovedadCruda]:
         user_id = client.user_id_from_username(handle)
         items: list[NovedadCruda] = []
@@ -111,7 +113,9 @@ class InstagramFuente:
             external_id=f"instagram_story:{story.pk}",
             fuente=self.nombre,
             origen=f"@{handle}",
-            url=None,  # las stories no tienen URL pública permanente
+            # La story no tiene URL permanente (expira en 24h): linkeamos al
+            # perfil del centro en su lugar.
+            url=f"https://www.instagram.com/{handle}/",
             texto=getattr(story, "caption_text", None) or None,
             imagen_bytes=_descargar(img_url),
             imagen_url=img_url,

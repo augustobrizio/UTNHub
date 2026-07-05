@@ -1,39 +1,62 @@
-"""Repository de novedades e ingesta_log."""
+"""Repository de novedades: centros, fuentes e ingesta_log."""
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.db.models.novedad import IngestaLog, Novedad
+from app.db.models.novedad import Centro, IngestaLog, Novedad, NovedadFuente
 
 
-# --- Dedup --------------------------------------------------------------------
+def get_or_create_centro(
+    db: Session,
+    *,
+    handle: str,
+    nombre: str,
+    tipo: str,
+    url_perfil: str | None = None,
+    logo_url: str | None = None,
+) -> Centro:
+    centro = db.execute(
+        select(Centro).where(Centro.handle == handle)
+    ).scalar_one_or_none()
+    if centro is not None:
+        return centro
+    centro = Centro(
+        handle=handle,
+        nombre=nombre,
+        tipo=tipo,
+        url_perfil=url_perfil,
+        logo_url=logo_url,
+    )
+    db.add(centro)
+    db.flush()
+    return centro
+
+
 def external_ids_existentes(
     db: Session, external_ids: Iterable[str]
 ) -> set[str]:
-    """Devuelve, de los ``external_ids`` dados, cuáles ya están en la DB.
-
-    Se usa para filtrar items ya vistos *antes* de invocar al clasificador IA
-    (ahorro de tokens / idempotencia).
-    """
+    """De los ``external_ids`` dados, cuáles ya están registrados (dedup exacto)."""
     ids = [eid for eid in external_ids if eid]
     if not ids:
         return set()
-    stmt = select(Novedad.external_id).where(Novedad.external_id.in_(ids))
-    return {row[0] for row in db.execute(stmt).all() if row[0] is not None}
+    stmt = select(NovedadFuente.external_id).where(
+        NovedadFuente.external_id.in_(ids)
+    )
+    return {row[0] for row in db.execute(stmt).all()}
 
 
-# --- Escritura ----------------------------------------------------------------
 def crear_novedad(
     db: Session,
     *,
+    centro: Centro,
     external_id: str,
-    fuente: str,
-    origen: str | None,
-    url: str | None,
+    fuente_url: str | None,
+    fuente_imagen_url: str | None,
+    fuente_imagen_path: str | None,
     titulo: str | None,
     descripcion: str | None,
     categoria: str | None,
@@ -44,12 +67,8 @@ def crear_novedad(
     motivo_descarte: str | None,
     fecha_publicacion: datetime | None,
 ) -> Novedad:
-    """Inserta una novedad ya clasificada. Hace flush (no commit)."""
+    """Crea una novedad canónica + su primera fuente. Hace flush (no commit)."""
     novedad = Novedad(
-        external_id=external_id,
-        fuente=fuente,
-        origen=origen,
-        url=url,
         titulo=titulo,
         descripcion=descripcion,
         categoria=categoria,
@@ -62,49 +81,91 @@ def crear_novedad(
     )
     db.add(novedad)
     db.flush()
+    agregar_fuente(
+        db,
+        novedad=novedad,
+        centro=centro,
+        external_id=external_id,
+        url=fuente_url,
+        imagen_url=fuente_imagen_url,
+        imagen_path=fuente_imagen_path,
+        fecha_publicacion=fecha_publicacion,
+    )
     return novedad
 
 
-# --- Lectura ------------------------------------------------------------------
+def agregar_fuente(
+    db: Session,
+    *,
+    novedad: Novedad,
+    centro: Centro,
+    external_id: str,
+    url: str | None,
+    imagen_url: str | None,
+    imagen_path: str | None,
+    fecha_publicacion: datetime | None,
+) -> NovedadFuente:
+    """Suma una fuente a una novedad existente (dedup Fase 2). Hace flush."""
+    fuente = NovedadFuente(
+        novedad_id=novedad.id,
+        centro_id=centro.id,
+        external_id=external_id,
+        url=url,
+        imagen_url=imagen_url,
+        imagen_path=imagen_path,
+        fecha_publicacion=fecha_publicacion,
+    )
+    db.add(fuente)
+    db.flush()
+    return fuente
+
+
 def listar(
     db: Session,
     *,
-    fuente: str | None = None,
     categoria: str | None = None,
     estado: str | None = "publicada",
     limite: int = 20,
     offset: int = 0,
 ) -> Sequence[Novedad]:
-    """Lista novedades ordenadas por fecha de publicación descendente.
-
-    Por defecto solo trae las ``publicada`` (lo que ve el estudiante). Pasar
-    ``estado=None`` para traer todos los estados (uso admin / moderación).
-    """
+    """Novedades (con fuentes y centros) ordenadas por fecha de ingesta desc."""
     stmt = select(Novedad)
-    if fuente is not None:
-        stmt = stmt.where(Novedad.fuente == fuente)
     if categoria is not None:
         stmt = stmt.where(Novedad.categoria == categoria)
     if estado is not None:
         stmt = stmt.where(Novedad.estado == estado)
-    # Orden por fecha de ingesta (created_at): a futuro ingesta ~= publicación.
-    stmt = stmt.order_by(
-        Novedad.created_at.desc().nullslast(),
-        Novedad.id.desc(),
+    stmt = (
+        stmt.options(selectinload(Novedad.fuentes).joinedload(NovedadFuente.centro))
+        .order_by(Novedad.created_at.desc().nullslast(), Novedad.id.desc())
+        .limit(limite)
+        .offset(offset)
     )
-    stmt = stmt.limit(limite).offset(offset)
+    return db.execute(stmt).scalars().all()
+
+
+def recientes_para_dedup(db: Session, *, limite: int = 30) -> Sequence[Novedad]:
+    """Últimas novedades no descartadas, como contexto de dedup semántico."""
+    stmt = (
+        select(Novedad)
+        .where(Novedad.estado != "descartada")
+        .order_by(Novedad.created_at.desc().nullslast(), Novedad.id.desc())
+        .limit(limite)
+    )
     return db.execute(stmt).scalars().all()
 
 
 def get(db: Session, novedad_id: int) -> Novedad | None:
-    """Obtiene una novedad por ID."""
-    return db.get(Novedad, novedad_id)
+    stmt = (
+        select(Novedad)
+        .where(Novedad.id == novedad_id)
+        .options(selectinload(Novedad.fuentes).joinedload(NovedadFuente.centro))
+    )
+    return db.execute(stmt).scalar_one_or_none()
 
 
 def actualizar_estado(
     db: Session, novedad_id: int, estado: str
 ) -> Novedad | None:
-    """Cambia el estado de moderación de una novedad. Hace flush (no commit)."""
     novedad = db.get(Novedad, novedad_id)
     if novedad is None:
         return None
@@ -113,7 +174,6 @@ def actualizar_estado(
     return novedad
 
 
-# --- Auditoría (RNF-08) -------------------------------------------------------
 def crear_ingesta_log(
     db: Session,
     *,
@@ -128,7 +188,6 @@ def crear_ingesta_log(
     estado: str,
     errores: list[str] | None,
 ) -> IngestaLog:
-    """Registra una corrida del pipeline. Hace flush (no commit)."""
     log = IngestaLog(
         fuente=fuente,
         iniciado_en=iniciado_en,

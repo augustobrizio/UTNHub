@@ -1,9 +1,4 @@
-"""Jobs de ingesta.
-
-Cada job es un wrapper fino que abre una sesión de DB, construye la(s)
-fuente(s) que le corresponden e invoca el callable host-agnóstico del service.
-La lógica de ingesta NO vive acá: esto solo adapta "disparador -> callable".
-"""
+"""Jobs de ingesta: wrappers finos que adaptan disparador -> callable del service."""
 from __future__ import annotations
 
 import logging
@@ -16,9 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 def ingesta_instagram() -> None:
-    """Corre la ingesta solo de la fuente Instagram."""
     settings = get_settings()
-    if not (settings.instagram_handles_list and settings.instagram_usuario):
+    if not (
+        settings.instagram_handles_list
+        and (settings.instagram_sessionid or settings.instagram_usuario)
+    ):
         logger.info("Ingesta Instagram omitida: fuente no configurada.")
         return
     from app.scrapers.novedades.instagram import InstagramFuente
@@ -27,7 +24,6 @@ def ingesta_instagram() -> None:
 
 
 def ingesta_utn_web() -> None:
-    """Corre la ingesta solo de la fuente sitio web FRRO."""
     settings = get_settings()
     if not settings.utn_novedades_url:
         logger.info("Ingesta UTN web omitida: fuente no configurada.")

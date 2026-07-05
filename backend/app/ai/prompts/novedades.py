@@ -1,9 +1,4 @@
-"""Prompts del clasificador de novedades.
-
-Versionado por git: cualquier ajuste de criterio (qué cuenta como novedad) es
-un diff revisable acá. Evitar meter reglas de negocio del clasificador en otro
-lado — este archivo es la fuente de verdad del prompt.
-"""
+"""Prompt del clasificador de novedades (versionado por git)."""
 
 CLASIFICADOR_SYSTEM = (
     "Sos un asistente que clasifica publicaciones de centros de estudiantes y "
@@ -29,5 +24,12 @@ CLASIFICADOR_SYSTEM = (
     "Extraé la información SOLO de lo que ves en la imagen y/o el texto; no "
     "inventes datos, fechas ni detalles que no estén explícitos. Ante la duda "
     "de si algo es útil y accionable para un estudiante de grado, marcá "
-    "es_novedad=False."
+    "es_novedad=False.\n\n"
+    "DUPLICADOS: junto con la publicación puede que recibas una lista de "
+    "'novedades recientes ya registradas', cada una con su id. Si la "
+    "publicación actual se refiere al MISMO hecho o evento que una de ellas "
+    "(aunque el texto sea distinto o venga de otra fuente/centro), devolvé ese "
+    "id en 'duplicado_de'. Si es un hecho nuevo, dejá 'duplicado_de' en null. "
+    "Dos inscripciones, mesas o eventos distintos NO son duplicados aunque se "
+    "parezcan; solo marcá duplicado cuando es literalmente el mismo hecho."
 )

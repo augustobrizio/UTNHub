@@ -1,23 +1,12 @@
-"""Clasificador IA de novedades (OpenAI vía LangChain).
+"""Clasificador IA de novedades (OpenAI vía LangChain, structured output + visión).
 
-Recibe un item crudo (``NovedadCruda``) — imagen del flyer/story y/o texto —
-y devuelve una ``ClasificacionNovedad`` estructurada: si es novedad, su
-categoría, título, descripción, fecha y confianza.
-
-Patrón usado (doc oficial LangChain):
-- ``ChatOpenAI(...).with_structured_output(Modelo, method="json_schema")``
-  fuerza salida que valida contra el schema Pydantic.
-- La imagen se pasa como content block ``{"type": "image", "base64": ...,
-  "mime_type": ...}`` dentro del ``HumanMessage``.
-
-El prompt vive en ``app/ai/prompts/novedades.py`` (versionado por git). El
-modelo se lee de config (``NOVEDADES_LLM_MODEL``), no se hardcodea. El cliente
-se construye perezosamente y se cachea para reusar la conexión.
+Prompt en ``app/ai/prompts/novedades.py``; modelo por ``NOVEDADES_LLM_MODEL``.
 """
 from __future__ import annotations
 
 import base64
 import logging
+from collections.abc import Sequence
 from functools import lru_cache
 
 from app.ai import placeholders
@@ -30,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class ResultadoClasificacion:
-    """Wrapper liviano: clasificación + tokens consumidos (para auditoría)."""
-
     __slots__ = ("clasificacion", "tokens")
 
     def __init__(self, clasificacion: ClasificacionNovedad, tokens: int) -> None:
@@ -41,7 +28,6 @@ class ResultadoClasificacion:
 
 @lru_cache
 def _get_llm():
-    """Construye (y cachea) el cliente ChatOpenAI con structured output."""
     # Import local para no exigir langchain-openai si no se usa el clasificador.
     from langchain_openai import ChatOpenAI
 
@@ -63,8 +49,9 @@ def _get_llm():
     )
 
 
-def _build_message(item: NovedadCruda) -> dict:
-    """Arma el HumanMessage multimodal a partir del item crudo."""
+def _build_message(
+    item: NovedadCruda, recientes: Sequence[tuple[int, str]]
+) -> dict:
     usar_imagen = item.usar_vision and item.imagen_bytes is not None
     content: list[dict] = []
     instruccion = "Clasificá la siguiente publicación.\n"
@@ -82,6 +69,13 @@ def _build_message(item: NovedadCruda) -> dict:
         "nombre de archivo que mejor represente la novedad, o null):\n"
         f"{placeholders.catalogo_para_prompt()}\n"
     )
+    if recientes:
+        lineas = "\n".join(f"- id {rid}: {titulo}" for rid, titulo in recientes)
+        instruccion += (
+            "\nNovedades recientes ya registradas (para detectar duplicados, "
+            "campo duplicado_de):\n"
+            f"{lineas}\n"
+        )
     content.append({"type": "text", "text": instruccion})
 
     if usar_imagen:
@@ -95,25 +89,27 @@ def _build_message(item: NovedadCruda) -> dict:
     return {"role": "user", "content": content}
 
 
-def clasificar(item: NovedadCruda) -> ResultadoClasificacion:
-    """Clasifica un item crudo. Propaga excepciones para que las maneje el
-    service (un fallo del LLM no debe tumbar la corrida completa).
+def clasificar(
+    item: NovedadCruda,
+    recientes: Sequence[tuple[int, str]] | None = None,
+) -> ResultadoClasificacion:
+    """``recientes`` = lista ``(id, titulo)`` de novedades ya registradas,
+    contexto para el dedup semántico. Propaga excepciones (las maneja el service).
     """
+    recientes = recientes or []
     llm = _get_llm()
     messages = [
         {"role": "system", "content": CLASIFICADOR_SYSTEM},
-        _build_message(item),
+        _build_message(item, recientes),
     ]
     resultado = llm.invoke(messages)
-
-    # Con include_raw=True el retorno es {"raw": AIMessage, "parsed": Modelo,
-    # "parsing_error": ...}. Usamos raw para extraer el uso de tokens.
     clasificacion: ClasificacionNovedad = resultado["parsed"]
 
-    # El LLM a veces devuelve un nombre que no está en el catálogo: lo anulamos
-    # para no guardar una ruta rota.
+    # Anulamos elecciones inventadas por el LLM (placeholder o id fuera de rango).
     if clasificacion.imagen_sugerida not in placeholders.NOMBRES:
         clasificacion.imagen_sugerida = None
+    if clasificacion.duplicado_de not in {rid for rid, _ in recientes}:
+        clasificacion.duplicado_de = None
 
     raw = resultado.get("raw")
     tokens = 0

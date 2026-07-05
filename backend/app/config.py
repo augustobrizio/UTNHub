@@ -19,52 +19,36 @@ class Settings(BaseSettings):
     database_url: str = Field(..., alias="DATABASE_URL")
     environment: str = Field(default="dev", alias="ENVIRONMENT")
 
-    # --- Clasificador IA de novedades (OpenAI vía LangChain) ---------------
+    # Clasificador IA de novedades (OpenAI). gpt-4o-mini: barato y suficiente.
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
-    # Modelo con visión + structured outputs. Default gpt-4o-mini
-    # ($0.15/$0.60 por 1M): barato y clasifica bien el criterio del panel.
-    # Probamos gpt-4.1-nano (más barato) pero descartaba novedades válidas
-    # (p.ej. el programa de reincorporación), así que no compensa el ahorro.
-    # gpt-4.1-mini es una opción si se necesita más precisión.
     novedades_llm_model: str = Field(
         default="gpt-4o-mini", alias="NOVEDADES_LLM_MODEL"
     )
-    # Umbral de confianza para autopublicar (>=) vs dejar pendiente de
-    # moderación. Por debajo del piso de descarte el item se descarta.
     novedades_umbral_publicar: float = Field(
         default=0.75, alias="NOVEDADES_UMBRAL_PUBLICAR"
     )
-    # Tope de items que pasan al clasificador por corrida (control de costos,
-    # RNF-11). Los items nuevos por encima del tope se difieren a la próxima.
+    # Tope de items clasificados por corrida (control de costos, RNF-11).
     novedades_max_items_por_corrida: int = Field(
         default=40, alias="NOVEDADES_MAX_ITEMS_POR_CORRIDA"
     )
 
-    # --- Fuente: Instagram (cuenta bot dedicada, sesión reusada) -----------
+    # Instagram: sessionid de un browser (recomendado); usuario/password fallback.
+    instagram_sessionid: str | None = Field(default=None, alias="INSTAGRAM_SESSIONID")
     instagram_usuario: str | None = Field(default=None, alias="INSTAGRAM_USUARIO")
     instagram_password: str | None = Field(default=None, alias="INSTAGRAM_PASSWORD")
-    # Path al archivo de settings/sesión de instagrapi (se persiste para no
-    # re-loguear en cada corrida — reduce el riesgo de baneo).
     instagram_session_path: str = Field(
         default="/data/instagram_session.json", alias="INSTAGRAM_SESSION_PATH"
     )
-    # Handles de centros de estudiantes a seguir, separados por coma.
     instagram_handles: str = Field(default="", alias="INSTAGRAM_HANDLES")
-    # Directorio donde se guardan las imágenes descargadas (evidencia / cita).
     novedades_media_dir: str = Field(
         default="/data/novedades_media", alias="NOVEDADES_MEDIA_DIR"
     )
 
-    # --- Fuente: sitio web FRRO --------------------------------------------
-    # URL de la sección de novedades/noticias de FRRO (a confirmar).
     utn_novedades_url: str | None = Field(default=None, alias="UTN_NOVEDADES_URL")
 
-    # --- Scheduler (APScheduler in-process; desactivable en serverless) ----
+    # Scheduler in-process (desactivable en serverless). Intervalo por fuente (RNF-07).
     scheduler_enabled: bool = Field(default=False, alias="SCHEDULER_ENABLED")
-    # Intervalo de ingesta por fuente, en horas (RNF-07: configurable por fuente).
-    ingesta_instagram_horas: int = Field(
-        default=6, alias="INGESTA_INSTAGRAM_HORAS"
-    )
+    ingesta_instagram_horas: int = Field(default=6, alias="INGESTA_INSTAGRAM_HORAS")
     ingesta_utn_web_horas: int = Field(default=24, alias="INGESTA_UTN_WEB_HORAS")
 
     @property

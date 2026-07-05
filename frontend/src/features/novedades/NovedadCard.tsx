@@ -1,21 +1,7 @@
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import type { NovedadOut } from "@/lib/types";
 
-/**
- * Card de novedad — estetica "Vercel × UTN": canvas neutro, border hairline,
- * acento celeste. Construida sobre las primitivas shadcn (`Card`).
- *
- * Toda novedad muestra imagen: la propia del post, o un placeholder generico
- * (resuelto por el backend). La fecha es la de ingesta.
- */
-
 const CELESTE = "#1CA4DF";
-
-function fuenteLabel(n: NovedadOut): string {
-  if (n.fuente === "utn_web") return "FRRO";
-  if (n.fuente === "instagram") return n.origen ?? "Instagram";
-  return n.origen ?? "UTN";
-}
 
 function fechaCorta(iso: string | null): string | null {
   if (!iso) return null;
@@ -29,7 +15,9 @@ function fechaCorta(iso: string | null): string | null {
 
 export function NovedadCard({ novedad }: { novedad: NovedadOut }) {
   const fecha = fechaCorta(novedad.created_at);
-  const href = novedad.url ?? undefined;
+  const primaria = novedad.fuentes[0];
+  const centro = primaria?.centro;
+  const href = primaria?.url ?? undefined;
   const Root = (href ? "a" : "div") as "a";
 
   return (
@@ -74,12 +62,23 @@ export function NovedadCard({ novedad }: { novedad: NovedadOut }) {
           )}
 
           <CardFooter className="mt-4 border-t border-white/[0.05]">
-            <span
-              className="h-1.5 w-1.5 shrink-0 rounded-full"
-              style={{ backgroundColor: CELESTE }}
-            />
-            <span className="text-[11.5px] font-medium text-neutral-400">
-              {fuenteLabel(novedad)}
+            {centro?.logo_url ? (
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={centro.logo_url}
+                  alt=""
+                  className="h-3 w-3 object-contain"
+                />
+              </span>
+            ) : (
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: CELESTE }}
+              />
+            )}
+            <span className="truncate text-[11.5px] font-medium text-neutral-400">
+              {centro?.nombre ?? "UTN"}
             </span>
             {fecha && (
               <span className="ml-auto shrink-0 whitespace-nowrap text-[11.5px] tabular-nums text-neutral-500">

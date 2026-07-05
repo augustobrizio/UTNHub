@@ -8,16 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 CategoriaNovedadLiteral = Literal["evento", "aviso", "noticia", "general"]
 EstadoNovedadLiteral = Literal["publicada", "pendiente", "descartada"]
-FuenteNovedadLiteral = Literal["instagram", "utn_web"]
 
 
 class ClasificacionNovedad(BaseModel):
-    """Salida estructurada del clasificador IA para un item crudo.
-
-    El LLM recibe la imagen (flyer/story) y/o el texto y completa este schema.
-    ``es_novedad`` es el gate primario: si es ``False``, el item se descarta y
-    no se publica (evita ruido como memes o promos de merch).
-    """
+    """Salida estructurada del clasificador IA (los ``description`` guían al LLM)."""
 
     es_novedad: bool = Field(
         description=(
@@ -27,9 +21,7 @@ class ClasificacionNovedad(BaseModel):
             "no informativo."
         )
     )
-    categoria: CategoriaNovedadLiteral = Field(
-        description="Categoría de la novedad."
-    )
+    categoria: CategoriaNovedadLiteral = Field(description="Categoría de la novedad.")
     titulo: str = Field(description="Título corto y claro (máx ~90 caracteres).")
     descripcion: str = Field(
         description="Resumen objetivo del contenido, sin inventar datos."
@@ -58,48 +50,65 @@ class ClasificacionNovedad(BaseModel):
             "encaja. Se usa solo si la novedad no tiene imagen propia."
         ),
     )
+    duplicado_de: int | None = Field(
+        default=None,
+        description=(
+            "Si esta publicación se refiere al MISMO hecho/evento que una de "
+            "las 'novedades recientes ya registradas' provistas, su id. null "
+            "si es un hecho nuevo. Dos eventos distintos aunque parecidos NO "
+            "son duplicados."
+        ),
+    )
+
+
+class CentroOut(BaseModel):
+    handle: str
+    nombre: str
+    tipo: str
+    url_perfil: str | None = None
+    logo_url: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FuenteOut(BaseModel):
+    centro: CentroOut
+    url: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NovedadOut(BaseModel):
-    """Novedad expuesta por la API de lectura."""
-
     id: int
-    fuente: str | None = None
-    origen: str | None = None
     titulo: str | None = None
     descripcion: str | None = None
-    url: str | None = None
     imagen_url: str | None = None
     categoria: str | None = None
     estado: str
     confianza: float | None = None
     fecha_publicacion: datetime | None = None
     created_at: datetime | None = None
+    fuentes: list[FuenteOut] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ModerarNovedadIn(BaseModel):
-    """Cuerpo del PATCH de moderación."""
-
     estado: Literal["publicada", "descartada"]
 
 
 class ResultadoFuente(BaseModel):
-    """Contadores del pipeline para una fuente en una corrida."""
-
     fuente: str
     items_vistos: int = 0
     items_nuevos: int = 0
     items_novedad: int = 0
     items_descartados: int = 0
+    items_duplicados: int = 0
     estado: str = "ok"
     errores: list[str] = Field(default_factory=list)
 
 
 class ResultadoIngesta(BaseModel):
-    """Resultado de una corrida completa (POST ``/novedades/sincronizar``)."""
-
     fuentes: list[ResultadoFuente] = Field(default_factory=list)
 
     @property

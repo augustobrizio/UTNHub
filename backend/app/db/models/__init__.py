@@ -18,6 +18,7 @@ from app.db.models.chat import Conversacion, Mensaje  # noqa: F401
 from app.db.models.novedad import (  # noqa: F401
     CategoriaContenido,
     CategoriaNovedad,
+    Centro,
     EstadoIngesta,
     EstadoNovedad,
     FaqQuestion,
@@ -25,6 +26,7 @@ from app.db.models.novedad import (  # noqa: F401
     FuenteNovedad,
     IngestaLog,
     Novedad,
+    NovedadFuente,
 )
 from app.db.models.profesor import (  # noqa: F401
     HorarioConsulta,
@@ -36,6 +38,7 @@ from app.db.models.usuario import Usuario  # noqa: F401
 __all__ = [
     "CategoriaContenido",
     "CategoriaNovedad",
+    "Centro",
     "Comision",
     "CondicionMateria",
     "Conversacion",
@@ -53,6 +56,7 @@ __all__ = [
     "MateriaProfesor",
     "Mensaje",
     "Novedad",
+    "NovedadFuente",
     "Profesor",
     "TipoCorrelativa",
     "TipoEventoCalendario",
