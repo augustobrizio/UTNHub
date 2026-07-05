@@ -14,7 +14,7 @@ function fechaCorta(iso: string | null): string | null {
 }
 
 export function NovedadCard({ novedad }: { novedad: NovedadOut }) {
-  const fecha = fechaCorta(novedad.created_at);
+  const fecha = fechaCorta(novedad.fecha_publicacion ?? novedad.created_at);
   const primaria = novedad.fuentes[0];
   const centro = primaria?.centro;
   const href = primaria?.url ?? undefined;

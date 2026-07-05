@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.models.novedad import Centro, IngestaLog, Novedad, NovedadFuente
@@ -128,7 +128,14 @@ def listar(
     limite: int = 20,
     offset: int = 0,
 ) -> Sequence[Novedad]:
-    """Novedades (con fuentes y centros) ordenadas por fecha de ingesta desc."""
+    """Novedades (con fuentes y centros) ordenadas por fecha del evento/posteo desc.
+
+    Usa ``fecha_publicacion`` (fecha real del contenido) y no ``created_at``
+    (fecha de ingesta): sin esto, contenido viejo recién ingestado (ej. un
+    backfill de posts de IG de 2023) se mezclaba con lo genuinamente nuevo.
+    Cae a ``created_at`` cuando la fuente no expone fecha (ej. notas web).
+    """
+    orden = func.coalesce(Novedad.fecha_publicacion, Novedad.created_at)
     stmt = select(Novedad)
     if categoria is not None:
         stmt = stmt.where(Novedad.categoria == categoria)
@@ -136,7 +143,7 @@ def listar(
         stmt = stmt.where(Novedad.estado == estado)
     stmt = (
         stmt.options(selectinload(Novedad.fuentes).joinedload(NovedadFuente.centro))
-        .order_by(Novedad.created_at.desc().nullslast(), Novedad.id.desc())
+        .order_by(orden.desc().nullslast(), Novedad.id.desc())
         .limit(limite)
         .offset(offset)
     )
