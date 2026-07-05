@@ -1,6 +1,25 @@
 "use client";
 
+import { useTheme } from "next-themes";
+
 import { useSidebar } from "./SidebarContext";
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const esOscuro = resolvedTheme === "dark";
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(esOscuro ? "light" : "dark")}
+      className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--shell-fg-muted)] transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)]"
+      aria-label={esOscuro ? "Activar modo claro" : "Activar modo oscuro"}
+    >
+      <span className="material-symbols-outlined text-[20px]">
+        {esOscuro ? "light_mode" : "dark_mode"}
+      </span>
+    </button>
+  );
+}
 
 /**
  * Barra superior — lenguaje "Vercel × UTN": canvas neutro real, borders
@@ -22,7 +41,7 @@ function UtnLogo() {
 export function TopNav() {
   const { collapsed } = useSidebar();
   return (
-    <nav className="fixed top-0 z-50 flex h-16 w-full items-center gap-4 border-b border-white/[0.06] bg-[#0a0a0a]/90 px-6 backdrop-blur-xl">
+    <nav className="fixed top-0 z-50 flex h-16 w-full items-center gap-4 border-b border-[var(--shell-border)] bg-[var(--shell-panel)]/90 px-6 backdrop-blur-xl">
       {/* Logo + nombre — ancho alineado con la sidebar */}
       <div
         className={`flex shrink-0 items-center gap-3 transition-[width] duration-200 ease-out ${collapsed ? "w-9" : "w-56"}`}
@@ -30,10 +49,10 @@ export function TopNav() {
         <UtnLogo />
         {!collapsed && (
           <div className="leading-none">
-            <span className="font-headline text-[15px] font-extrabold tracking-tight text-neutral-50">
+            <span className="font-headline text-[15px] font-extrabold tracking-tight text-[var(--shell-fg)]">
               UTNHub
             </span>
-            <p className="mt-0.5 font-label text-[9px] uppercase tracking-[0.12em] text-neutral-500">
+            <p className="mt-0.5 font-label text-[9px] uppercase tracking-[0.12em] text-[var(--shell-fg-dim)]">
               ISI · UTN FRRO
             </p>
           </div>
@@ -41,16 +60,16 @@ export function TopNav() {
       </div>
 
       {/* Buscador */}
-      <div className="flex w-72 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 transition-colors hover:border-white/20 focus-within:border-[#1CA4DF]/50 focus-within:ring-1 focus-within:ring-[#1CA4DF]/20">
-        <span className="material-symbols-outlined shrink-0 text-[16px] text-neutral-500">
+      <div className="flex w-72 items-center gap-2 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] px-3 py-1.5 transition-colors hover:border-[var(--shell-border)] focus-within:border-[#1CA4DF]/50 focus-within:ring-1 focus-within:ring-[#1CA4DF]/20">
+        <span className="material-symbols-outlined shrink-0 text-[16px] text-[var(--shell-fg-dim)]">
           search
         </span>
         <input
-          className="min-w-0 flex-1 border-none bg-transparent text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none"
+          className="min-w-0 flex-1 border-none bg-transparent text-sm text-[var(--shell-fg)] placeholder:text-[var(--shell-fg-dim)] focus:outline-none"
           placeholder="Buscar materias, profesores..."
           type="text"
         />
-        <kbd className="hidden shrink-0 items-center rounded border border-white/15 px-1 py-0.5 font-label text-[9px] text-neutral-500 lg:inline-flex">
+        <kbd className="hidden shrink-0 items-center rounded border border-[var(--shell-border)] px-1 py-0.5 font-label text-[9px] text-[var(--shell-fg-dim)] lg:inline-flex">
           ⌘K
         </kbd>
       </div>
@@ -59,18 +78,20 @@ export function TopNav() {
 
       {/* Acciones */}
       <div className="flex items-center gap-2">
+        <ThemeToggle />
+
         <button
           type="button"
-          className="relative flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-white/[0.05] hover:text-neutral-100"
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg text-[var(--shell-fg-muted)] transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)]"
           aria-label="Notificaciones"
         >
           <span className="material-symbols-outlined text-[20px]">notifications</span>
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-[#0a0a0a] bg-[#1CA4DF]" />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-[var(--shell-panel)] bg-[#1CA4DF]" />
         </button>
 
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#1CA4DF]/25 bg-[#1CA4DF]/10 font-headline text-xs font-extrabold text-[#4EC0EC] transition-colors hover:bg-[#1CA4DF]/15"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#1CA4DF]/25 bg-[#1CA4DF]/10 font-headline text-xs font-extrabold text-[var(--shell-accent-fg)] transition-colors hover:bg-[#1CA4DF]/15"
           aria-label="Cuenta"
         >
           JR

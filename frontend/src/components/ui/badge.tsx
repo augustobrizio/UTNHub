@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 type BadgeVariant = "celeste" | "neutral" | "outline";
 
 const VARIANTS: Record<BadgeVariant, string> = {
-  celeste: "bg-[#1CA4DF]/10 text-[#4EC0EC] border-transparent",
-  neutral: "bg-white/[0.04] text-neutral-400 border-transparent",
-  outline: "text-neutral-300 border-white/15",
+  celeste: "bg-[#1CA4DF]/10 text-[var(--shell-accent-fg)] border-transparent",
+  neutral: "bg-[var(--shell-hover)] text-[var(--shell-fg-muted)] border-transparent",
+  outline: "text-[var(--shell-fg-muted)] border-[var(--shell-border)]",
 };
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {

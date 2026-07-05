@@ -184,6 +184,7 @@ def _clasificar_y_persistir(
         fuente_imagen_path=imagen_path,
         titulo=clf.titulo,
         descripcion=clf.descripcion,
+        contenido=clf.contenido,
         categoria=clf.categoria,
         imagen_url=imagen_url,
         imagen_path=imagen_path,
@@ -267,12 +268,22 @@ def listar(
     *,
     categoria: str | None = None,
     estado: str | None = "publicada",
+    centro: str | None = None,
     limite: int = 20,
     offset: int = 0,
 ):
     return novedad_repo.listar(
-        db, categoria=categoria, estado=estado, limite=limite, offset=offset
+        db,
+        categoria=categoria,
+        estado=estado,
+        centro=centro,
+        limite=limite,
+        offset=offset,
     )
+
+
+def listar_centros(db: Session):
+    return novedad_repo.listar_centros(db)
 
 
 def resolver_imagenes_portada(novedades: Sequence) -> list[str | None]:

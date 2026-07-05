@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.novedad import (
     CategoriaNovedadLiteral,
+    CentroOut,
     EstadoNovedadLiteral,
     ModerarNovedadIn,
     NovedadOut,
@@ -26,6 +27,7 @@ def listar_novedades(
     estado: EstadoNovedadLiteral | None = Query(
         "publicada", description="Filtra por estado; None trae todos (admin)"
     ),
+    centro: str | None = Query(None, description="Handle del centro (ej. gradienteutn)"),
     limite: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> list[NovedadOut]:
@@ -34,6 +36,7 @@ def listar_novedades(
         db,
         categoria=categoria,
         estado=estado,
+        centro=centro,
         limite=limite,
         offset=offset,
     )
@@ -45,6 +48,14 @@ def listar_novedades(
         dto.imagen_url = imagen_url
         salida.append(dto)
     return salida
+
+
+@router.get("/centros", response_model=list[CentroOut])
+def listar_centros(
+    db: Annotated[Session, Depends(get_db)],
+) -> list[CentroOut]:
+    """Centros con al menos una novedad publicada (insumo del filtro por fuente)."""
+    return [CentroOut.model_validate(c) for c in novedad_service.listar_centros(db)]
 
 
 @router.get("/{novedad_id}", response_model=NovedadOut)

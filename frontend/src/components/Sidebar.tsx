@@ -30,7 +30,7 @@ function isActive(currentPath: string, href: string) {
 function Tooltip({ label }: { label: string }) {
   return (
     <span
-      className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-lg bg-[#0a0a0a] border border-white/10 px-2.5 py-1.5 text-xs font-medium text-neutral-200 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+      className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-lg bg-[var(--shell-panel)] border border-[var(--shell-border)] px-2.5 py-1.5 text-xs font-medium text-[var(--shell-fg)] opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
       style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}
     >
       {label}
@@ -44,11 +44,11 @@ export function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-white/[0.06] bg-[#0a0a0a] transition-[width] duration-200 ease-out"
+      className="fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-[var(--shell-border)] bg-[var(--shell-panel)] transition-[width] duration-200 ease-out"
       style={{ width: collapsed ? "64px" : "256px" }}
     >
       {/* Logo — alineado con el TopNav (h-16) */}
-      <div className={`flex h-16 shrink-0 items-center border-b border-white/[0.06] ${collapsed ? "justify-center px-0" : "gap-3 px-5"}`}>
+      <div className={`flex h-16 shrink-0 items-center border-b border-[var(--shell-border)] ${collapsed ? "justify-center px-0" : "gap-3 px-5"}`}>
         <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#1CA4DF]/25 bg-[#1CA4DF]/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -59,10 +59,10 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div className="leading-none">
-            <p className="font-headline text-[15px] font-extrabold tracking-tight text-neutral-50">
+            <p className="font-headline text-[15px] font-extrabold tracking-tight text-[var(--shell-fg)]">
               UTNHub
             </p>
-            <p className="mt-0.5 font-label text-[9px] uppercase tracking-[0.14em] text-neutral-500">
+            <p className="mt-0.5 font-label text-[9px] uppercase tracking-[0.14em] text-[var(--shell-fg-dim)]">
               ISI · UTN FRRO
             </p>
           </div>
@@ -72,7 +72,7 @@ export function Sidebar() {
       {/* Navegacion — cuando está colapsada NO recortamos overflow para que los tooltips puedan salir */}
       <nav className={`flex-1 pt-5 pb-3 space-y-0.5 ${collapsed ? "px-2 overflow-visible" : "px-3 overflow-y-auto overflow-x-hidden"}`}>
         {!collapsed && (
-          <p className="select-none px-3 pb-3 font-label text-[9px] uppercase tracking-[0.15em] text-neutral-600">
+          <p className="select-none px-3 pb-3 font-label text-[9px] uppercase tracking-[0.15em] text-[var(--shell-fg-dim)]">
             Módulos
           </p>
         )}
@@ -87,8 +87,8 @@ export function Sidebar() {
                 "group relative flex items-center gap-3 rounded-lg transition-all duration-200",
                 collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
                 active
-                  ? "bg-[#1CA4DF]/10 text-[#4EC0EC]"
-                  : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-100",
+                  ? "bg-[#1CA4DF]/10 text-[var(--shell-accent-fg)]"
+                  : "text-[var(--shell-fg-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)]",
               ].join(" ")}
             >
               {/* Accent pill del item activo (solo expandido) */}
@@ -112,13 +112,13 @@ export function Sidebar() {
       </nav>
 
       {/* Toggle colapsar */}
-      <div className={`shrink-0 border-t border-white/[0.06] py-2 ${collapsed ? "px-2" : "px-3"}`}>
+      <div className={`shrink-0 border-t border-[var(--shell-border)] py-2 ${collapsed ? "px-2" : "px-3"}`}>
         <button
           type="button"
           onClick={toggle}
           aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
           className={[
-            "group relative flex w-full items-center gap-3 rounded-lg text-neutral-400 transition-colors hover:bg-white/[0.04] hover:text-neutral-100",
+            "group relative flex w-full items-center gap-3 rounded-lg text-[var(--shell-fg-muted)] transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)]",
             collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
           ].join(" ")}
         >
@@ -131,18 +131,18 @@ export function Sidebar() {
       </div>
 
       {/* Usuario */}
-      <div className={`shrink-0 border-t border-white/[0.06] pb-4 pt-3 ${collapsed ? "px-2" : "px-3"}`}>
-        <div className={`group relative flex cursor-pointer items-center gap-3 rounded-lg transition-colors hover:bg-white/[0.04] ${collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"}`}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#1CA4DF]/25 bg-[#1CA4DF]/10 font-headline text-xs font-extrabold text-[#4EC0EC]">
+      <div className={`shrink-0 border-t border-[var(--shell-border)] pb-4 pt-3 ${collapsed ? "px-2" : "px-3"}`}>
+        <div className={`group relative flex cursor-pointer items-center gap-3 rounded-lg transition-colors hover:bg-[var(--shell-hover)] ${collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"}`}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#1CA4DF]/25 bg-[#1CA4DF]/10 font-headline text-xs font-extrabold text-[var(--shell-accent-fg)]">
             JR
           </div>
           {!collapsed && (
             <>
               <div className="min-w-0 flex-1 leading-none">
-                <p className="truncate text-xs font-semibold text-neutral-200">Julian Rossi</p>
-                <p className="mt-0.5 truncate text-[10px] text-neutral-500">Leg. 194.201</p>
+                <p className="truncate text-xs font-semibold text-[var(--shell-fg)]">Julian Rossi</p>
+                <p className="mt-0.5 truncate text-[10px] text-[var(--shell-fg-dim)]">Leg. 194.201</p>
               </div>
-              <span className="material-symbols-outlined text-[16px] text-neutral-600 transition-colors group-hover:text-neutral-400">
+              <span className="material-symbols-outlined text-[16px] text-[var(--shell-fg-dim)] transition-colors group-hover:text-[var(--shell-fg-muted)]">
                 unfold_more
               </span>
             </>

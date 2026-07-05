@@ -26,6 +26,16 @@ class ClasificacionNovedad(BaseModel):
     descripcion: str = Field(
         description="Resumen objetivo del contenido, sin inventar datos."
     )
+    contenido: str | None = Field(
+        default=None,
+        description=(
+            "Cuerpo mas largo (2-4 oraciones) para el detalle de la novedad, "
+            "combinando lo que se VE en la imagen (si es un flyer/story) con "
+            "el texto de la publicación. Sin inventar datos que no estén en "
+            "la imagen o el texto. null si 'descripcion' ya cubre todo lo "
+            "relevante (ej. una nota de texto plano, sin flyer)."
+        ),
+    )
     fecha_evento: date | None = Field(
         default=None,
         description=(
@@ -82,6 +92,7 @@ class NovedadOut(BaseModel):
     id: int
     titulo: str | None = None
     descripcion: str | None = None
+    contenido: str | None = None
     imagen_url: str | None = None
     categoria: str | None = None
     estado: str

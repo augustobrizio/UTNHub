@@ -258,6 +258,7 @@ export interface NovedadOut {
   id: number;
   titulo: string | null;
   descripcion: string | null;
+  contenido: string | null;
   imagen_url: string | null;
   categoria: CategoriaNovedad | string | null;
   estado: EstadoNovedad;

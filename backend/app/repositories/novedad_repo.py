@@ -59,6 +59,7 @@ def crear_novedad(
     fuente_imagen_path: str | None,
     titulo: str | None,
     descripcion: str | None,
+    contenido: str | None = None,
     categoria: str | None,
     imagen_url: str | None,
     imagen_path: str | None,
@@ -71,6 +72,7 @@ def crear_novedad(
     novedad = Novedad(
         titulo=titulo,
         descripcion=descripcion,
+        contenido=contenido,
         categoria=categoria,
         imagen_url=imagen_url,
         imagen_path=imagen_path,
@@ -125,6 +127,7 @@ def listar(
     *,
     categoria: str | None = None,
     estado: str | None = "publicada",
+    centro: str | None = None,
     limite: int = 20,
     offset: int = 0,
 ) -> Sequence[Novedad]:
@@ -141,11 +144,32 @@ def listar(
         stmt = stmt.where(Novedad.categoria == categoria)
     if estado is not None:
         stmt = stmt.where(Novedad.estado == estado)
+    if centro is not None:
+        stmt = stmt.where(
+            Novedad.id.in_(
+                select(NovedadFuente.novedad_id)
+                .join(Centro, Centro.id == NovedadFuente.centro_id)
+                .where(Centro.handle == centro)
+            )
+        )
     stmt = (
         stmt.options(selectinload(Novedad.fuentes).joinedload(NovedadFuente.centro))
         .order_by(orden.desc().nullslast(), Novedad.id.desc())
         .limit(limite)
         .offset(offset)
+    )
+    return db.execute(stmt).scalars().all()
+
+
+def listar_centros(db: Session) -> Sequence[Centro]:
+    """Centros con al menos una novedad publicada (insumo del filtro por fuente)."""
+    stmt = (
+        select(Centro)
+        .join(NovedadFuente, NovedadFuente.centro_id == Centro.id)
+        .join(Novedad, Novedad.id == NovedadFuente.novedad_id)
+        .where(Novedad.estado == "publicada")
+        .distinct()
+        .order_by(Centro.nombre)
     )
     return db.execute(stmt).scalars().all()
 

@@ -99,6 +99,7 @@ class Novedad(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     titulo: Mapped[str | None] = mapped_column(Text, nullable=True)
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contenido: Mapped[str | None] = mapped_column(Text, nullable=True)
     categoria: Mapped[str | None] = mapped_column(Text, nullable=True)
     imagen_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     imagen_path: Mapped[str | None] = mapped_column(Text, nullable=True)

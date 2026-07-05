@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 /**
  * Manrope (titulares — geometrico, "high-tech identity") e
@@ -35,7 +36,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`dark ${inter.variable} ${manrope.variable}`}
+      className={`${inter.variable} ${manrope.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -46,7 +47,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-surface text-on-surface font-body selection:bg-primary/30 antialiased">
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

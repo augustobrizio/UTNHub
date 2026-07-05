@@ -1,24 +1,34 @@
+import { FiltroFuentes } from "@/features/novedades/FiltroFuentes";
 import { NovedadCard } from "@/features/novedades/NovedadCard";
-import { listarNovedades } from "@/lib/api";
-import type { NovedadOut } from "@/lib/types";
+import { listarCentros, listarNovedades } from "@/lib/api";
+import type { CentroOut, NovedadOut } from "@/lib/types";
 
 // Cuantas novedades entran en la portada (numero generico por ahora). Tambien
 // define la ventana de dedup de placeholders en el backend.
 const PORTADA_LIMITE = 12;
 
-export default async function NovedadesPage() {
+export default async function NovedadesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ centro?: string }>;
+}) {
+  const { centro } = await searchParams;
   let novedades: NovedadOut[] = [];
+  let centros: CentroOut[] = [];
   let error = false;
   try {
-    novedades = await listarNovedades({ limite: PORTADA_LIMITE });
+    [novedades, centros] = await Promise.all([
+      listarNovedades({ limite: PORTADA_LIMITE, centro }),
+      listarCentros(),
+    ]);
   } catch {
     error = true;
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#09090b]">
+    <div className="min-h-[calc(100vh-4rem)] bg-[var(--shell-canvas)]">
       {/* Hero con identidad UTN: wash celeste + isotipo difuminado + membrete */}
-      <header className="relative overflow-hidden border-b border-white/[0.06]">
+      <header className="relative overflow-hidden border-b border-[var(--shell-border)]">
         <div aria-hidden className="pointer-events-none absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_88%_-10%,rgba(28,164,223,0.16),transparent_55%)]" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -43,15 +53,15 @@ export default async function NovedadesPage() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1CA4DF] opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-[#1CA4DF]" />
             </span>
-            <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-neutral-500">
+            <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--shell-fg-dim)]">
               Actualizado automaticamente
             </span>
           </div>
 
-          <h1 className="font-headline text-4xl font-bold tracking-tight text-neutral-50 md:text-[52px] md:leading-[1.05]">
+          <h1 className="font-headline text-4xl font-bold tracking-tight text-[var(--shell-fg)] md:text-[52px] md:leading-[1.05]">
             Novedades
           </h1>
-          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-neutral-400">
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--shell-fg-muted)]">
             Avisos, fechas y anuncios de la facultad, reunidos automaticamente
             en un solo lugar.
           </p>
@@ -60,6 +70,8 @@ export default async function NovedadesPage() {
 
       {/* Contenido */}
       <div className="mx-auto max-w-6xl px-8 py-9">
+        {!error && <FiltroFuentes centros={centros} activo={centro} />}
+
         {error ? (
           <EstadoVacio
             icono="cloud_off"
@@ -94,16 +106,16 @@ function EstadoVacio({
   detalle: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-[#0c0c0e] px-6 py-24 text-center">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] px-6 py-24 text-center">
       <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1CA4DF]/10">
-        <span className="material-symbols-outlined text-3xl text-[#4EC0EC]">
+        <span className="material-symbols-outlined text-3xl text-[var(--shell-accent-fg)]">
           {icono}
         </span>
       </div>
-      <h2 className="font-headline text-lg font-semibold tracking-tight text-neutral-200">
+      <h2 className="font-headline text-lg font-semibold tracking-tight text-[var(--shell-fg)]">
         {titulo}
       </h2>
-      <p className="mt-1.5 max-w-sm text-[13.5px] leading-relaxed text-neutral-500">
+      <p className="mt-1.5 max-w-sm text-[13.5px] leading-relaxed text-[var(--shell-fg-dim)]">
         {detalle}
       </p>
     </div>
