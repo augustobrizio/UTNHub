@@ -1,7 +1,7 @@
 """Storage S3 para media de novedades (copia propia, las URLs de origen expiran).
 
-Opcional: si no hay credenciales/bucket configurados (dev sin AWS), el
-llamador debe caer a un fallback propio — ``subir`` devuelve ``None``.
+Opcional: si no hay bucket configurado (dev sin AWS), el llamador debe caer
+a un fallback propio — ``subir`` devuelve ``None``.
 """
 from __future__ import annotations
 
@@ -18,21 +18,39 @@ def _cliente():
     import boto3
 
     settings = get_settings()
-    return boto3.client(
-        "s3",
-        region_name=settings.aws_region,
-        aws_access_key_id=settings.aws_access_key_id,
-        aws_secret_access_key=settings.aws_secret_access_key,
-    )
+    # Con session_token (credencial temporal, ej. rol de Lambda) hay que
+    # dejar que boto3 resuelva el trío completo solo, o AWS rechaza todo
+    # con "InvalidAccessKeyId".
+    if (
+        settings.aws_access_key_id
+        and settings.aws_secret_access_key
+        and not settings.aws_session_token
+    ):
+        return boto3.client(
+            "s3",
+            region_name=settings.aws_region,
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+        )
+    return boto3.client("s3", region_name=settings.aws_region)
 
 
 def habilitado() -> bool:
     settings = get_settings()
-    return bool(
-        settings.aws_s3_bucket
-        and settings.aws_access_key_id
-        and settings.aws_secret_access_key
-    )
+    return bool(settings.aws_s3_bucket)
+
+
+def bajar(key: str) -> bytes | None:
+    """Descarga un objeto del bucket; None si no existe, no está configurado o falla."""
+    if not habilitado():
+        return None
+    settings = get_settings()
+    try:
+        resp = _cliente().get_object(Bucket=settings.aws_s3_bucket, Key=key)
+        return resp["Body"].read()
+    except Exception:  # noqa: BLE001
+        logger.info("No se encontró %s en S3 (o fallo la descarga)", key)
+        return None
 
 
 def subir(contenido: bytes, key: str, *, content_type: str = "image/jpeg") -> str | None:

@@ -1,12 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
 import { useSidebar } from "./SidebarContext";
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-  const esOscuro = resolvedTheme === "dark";
+  // El server no conoce el tema real (vive en localStorage) — hasta que
+  // el cliente monte, mostramos un icono fijo para no romper la hidratación.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
+
+  const esOscuro = montado ? resolvedTheme === "dark" : true;
   return (
     <button
       type="button"

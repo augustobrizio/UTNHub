@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     aws_secret_access_key: str | None = Field(
         default=None, alias="AWS_SECRET_ACCESS_KEY"
     )
+    # Lambda la inyecta sola (credencial temporal del rol); distingue keys
+    # estáticas de verdad de las de Lambda en storage.py.
+    aws_session_token: str | None = Field(default=None, alias="AWS_SESSION_TOKEN")
     aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
     aws_s3_bucket: str | None = Field(default=None, alias="AWS_S3_BUCKET")
 

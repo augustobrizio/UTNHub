@@ -1,0 +1,12 @@
+# Dependencias minimas para la Lambda de ingesta del sitio web de FRRO.
+# No es pyproject.toml completo: este camino no toca fastapi/langgraph/
+# pandas/pymupdf/etc. Separado achica la imagen.
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+pydantic>=2.0
+pydantic-settings>=2.0
+python-dotenv>=1.0
+httpx>=0.28
+beautifulsoup4>=4.13
+langchain-openai>=0.3
+boto3>=1.35

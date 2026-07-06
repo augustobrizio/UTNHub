@@ -12,8 +12,11 @@ from pathlib import Path
 import httpx
 
 from app.config import get_settings
+from app.core import storage
 from app.db.models.novedad import FuenteNovedad as FuenteNovedadEnum
 from app.scrapers.novedades.base import NovedadCruda
+
+SESSION_S3_KEY = "secrets/instagram_session.json"
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +50,16 @@ class InstagramFuente:
         client.delay_range = [1, 3]
         session_path = Path(settings.instagram_session_path)
 
+        # Bootstrap desde S3 si no hay sesión local (cold start de Lambda).
+        if not session_path.exists():
+            session_bytes = storage.bajar(SESSION_S3_KEY)
+            if session_bytes is not None:
+                session_path.parent.mkdir(parents=True, exist_ok=True)
+                session_path.write_bytes(session_bytes)
+
         # Sesión dumpeada: se reusa directo (validarla con un request público
         # entra en loop de redirects si la IP está flagueada). Para re-auth,
-        # borrar el archivo de sesión.
+        # borrar el archivo de sesión (local y en S3).
         if session_path.exists():
             client.load_settings(session_path)
             return client
@@ -67,6 +77,10 @@ class InstagramFuente:
 
         session_path.parent.mkdir(parents=True, exist_ok=True)
         client.dump_settings(session_path)
+        # Persistimos en S3 para que la próxima invocación reuse la sesión.
+        storage.subir(
+            session_path.read_bytes(), SESSION_S3_KEY, content_type="application/json"
+        )
         return client
 
     def _user_id(self, client, handle: str) -> str:

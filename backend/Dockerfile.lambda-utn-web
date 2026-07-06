@@ -1,0 +1,14 @@
+# Imagen de la Lambda de ingesta del sitio web de FRRO.
+# Base oficial de AWS (Amazon Linux + Runtime Interface Client) para que
+# pip instale binarios compatibles (ej. psycopg2).
+FROM public.ecr.aws/lambda/python:3.12
+
+# Requirements primero para cachear el layer de deps entre builds.
+COPY requirements-lambda-utn-web.txt ${LAMBDA_TASK_ROOT}/requirements.txt
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+
+# Solo el paquete app/ (codigo, no todo el repo).
+COPY app ${LAMBDA_TASK_ROOT}/app
+
+# CMD = modulo.funcion que Lambda invoca por cada evento.
+CMD ["app.lambda_handlers.ingesta_utn_web.handler"]
