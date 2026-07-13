@@ -15,8 +15,13 @@ import type {
   MateriaOut,
   OptimizacionOut,
   PreviewImportSysacad,
+  ProfesorDetalleOut,
+  ProfesorListItem,
   ResultadoImportSysacad,
   ResultadoSincCalendario,
+  ResultadoSincCatedras,
+  ResultadoSincHorarios,
+  ResultadoSincMails,
   TipoEventoCalendario,
   TipoMateria,
   TurnoPref,
@@ -361,6 +366,62 @@ export async function sincronizarCalendario(): Promise<ResultadoSincCalendario> 
   return res.json() as Promise<ResultadoSincCalendario>;
 }
 
+// ---------------------------------------------------------------------------
+// Profesores
+// ---------------------------------------------------------------------------
+
+export function listarProfesores(): Promise<ProfesorListItem[]> {
+  // revalidate corto: la lista cambia solo cuando corre una sincronizacion,
+  // y esas mutaciones invalidan el cache via router.refresh().
+  return request<ProfesorListItem[]>(`/profesores`, { revalidate: 30 });
+}
+
+export function getProfesorDetalle(id: number): Promise<ProfesorDetalleOut> {
+  return request<ProfesorDetalleOut>(`/profesores/${id}`, { revalidate: 30 });
+}
+
+/** Full refresh de horarios de consulta + catedras desde el sitio del Dpto. ISI. */
+export async function sincronizarHorariosProfesores(): Promise<ResultadoSincHorarios> {
+  const res = await fetch(`${MUTATION_BASE}/profesores/sincronizar-horarios`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<ResultadoSincHorarios>;
+}
+
+/** Enriquece emails de docentes desde la sheet publica de UTNTAC. */
+export async function sincronizarMailsProfesores(): Promise<ResultadoSincMails> {
+  const res = await fetch(`${MUTATION_BASE}/profesores/sincronizar-mails`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<ResultadoSincMails>;
+}
+
+/** Crea catedras (profesor<->materia) desde la sheet de recomendaciones de UTNTAC. */
+export async function sincronizarCatedrasUtntac(): Promise<ResultadoSincCatedras> {
+  const res = await fetch(`${MUTATION_BASE}/profesores/sincronizar-catedras-utntac`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<ResultadoSincCatedras>;
+}
+
 export const api = {
   getGrafo,
   listarMaterias,
@@ -380,4 +441,9 @@ export const api = {
   seleccionarCursada,
   deseleccionarCursada,
   optimizarHorario,
+  listarProfesores,
+  getProfesorDetalle,
+  sincronizarHorariosProfesores,
+  sincronizarMailsProfesores,
+  sincronizarCatedrasUtntac,
 };
