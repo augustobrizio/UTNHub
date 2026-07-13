@@ -16,12 +16,24 @@ class HorarioOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProfesorMiniOut(BaseModel):
+    """Vista minima de un profesor para embeber en una cursada."""
+
+    id: int
+    nombre: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CursadaOut(BaseModel):
     id: int
     materia_codigo: str
     materia_nombre: str | None = None
     cuatrimestre: int | None
     docente: str | None = None
+    # Profesor real resuelto (None si el docente fue ambiguo o no matcheo).
+    # Se conserva ``docente`` como fallback.
+    profesor: ProfesorMiniOut | None = None
     horarios: list[HorarioOut] = []
 
     model_config = ConfigDict(from_attributes=True)

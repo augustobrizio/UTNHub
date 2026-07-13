@@ -8,6 +8,7 @@
 import type {
   ConfirmarImportIn,
   CriterioOptimizacion,
+  ComisionConProfesores,
   EventoCalendarioCreate,
   EventoCalendarioOut,
   GrafoResponse,
@@ -367,6 +368,19 @@ export async function sincronizarCalendario(): Promise<ResultadoSincCalendario> 
 }
 
 // ---------------------------------------------------------------------------
+// Comisiones (vista con profesores)
+// ---------------------------------------------------------------------------
+
+export function listarComisionesConProfesores(
+  anio?: number,
+): Promise<ComisionConProfesores[]> {
+  const qs = anio !== undefined ? `?anio=${anio}` : "";
+  return request<ComisionConProfesores[]>(`/comisiones/con-profesores${qs}`, {
+    revalidate: 30,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Profesores
 // ---------------------------------------------------------------------------
 
@@ -446,4 +460,5 @@ export const api = {
   sincronizarHorariosProfesores,
   sincronizarMailsProfesores,
   sincronizarCatedrasUtntac,
+  listarComisionesConProfesores,
 };

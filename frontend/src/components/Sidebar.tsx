@@ -16,6 +16,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: "Calendario",   icon: "calendar_month",  href: "/calendario"},
   { label: "Materias",     icon: "account_tree",    href: "/materias"  },
   { label: "Horarios",     icon: "schedule",        href: "/horarios"  },
+  { label: "Comisiones",   icon: "groups",          href: "/comisiones"},
   { label: "Novedades",    icon: "campaign",        href: "/novedades" },
   { label: "Profesores",   icon: "badge",           href: "/profesores"},
   { label: "Perfil",       icon: "person",          href: "/perfil"    },

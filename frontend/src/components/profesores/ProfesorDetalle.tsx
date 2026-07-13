@@ -5,14 +5,9 @@ import type {
   ProfesorDetalleOut,
 } from "@/lib/types";
 import { acentoProfesor, inicialesProfesor } from "@/lib/profesorAvatar";
+import { formatHora } from "@/lib/horario";
 
 const ANIO_ORD: Record<number, string> = { 1: "1ro", 2: "2do", 3: "3er", 4: "4to", 5: "5to" };
-
-/** "HH:MM:SS" → "HH:MM". Null-safe. */
-function hhmm(t: string | null): string | null {
-  if (!t) return null;
-  return t.slice(0, 5);
-}
 
 /**
  * Detalle de un profesor: datos de contacto, materias que dicta (solo
@@ -138,8 +133,8 @@ function MateriaItem({ materia }: { materia: MateriaProfesorOut }) {
 }
 
 function HorarioItem({ horario }: { horario: HorarioConsultaOut }) {
-  const inicio = hhmm(horario.hora_inicio);
-  const fin = hhmm(horario.hora_fin);
+  const inicio = formatHora(horario.hora_inicio);
+  const fin = formatHora(horario.hora_fin);
   const rango = inicio && fin ? `${inicio}–${fin}` : inicio ?? fin ?? "sin horario";
   return (
     <li className="rounded-xl bg-surface-container-low px-3.5 py-2.5">

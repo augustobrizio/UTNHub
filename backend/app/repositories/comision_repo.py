@@ -28,6 +28,28 @@ def listar_comisiones(
     return list(db.execute(stmt).scalars().all())
 
 
+def listar_comisiones_con_profesor(
+    db: Session, *, anio: int | None = None
+) -> list[Comision]:
+    """Comisiones con sus cursadas (todos los cuatrimestres) para la vista.
+
+    Eager-load de materia, horarios y el profesor resuelto de cada cursada.
+    Si ``anio`` es None, devuelve todas las comisiones.
+    """
+    stmt = (
+        select(Comision)
+        .options(
+            selectinload(Comision.cursadas).selectinload(Cursada.materia),
+            selectinload(Comision.cursadas).selectinload(Cursada.horarios),
+            selectinload(Comision.cursadas).selectinload(Cursada.profesor),
+        )
+        .order_by(Comision.anio, Comision.nombre)
+    )
+    if anio is not None:
+        stmt = stmt.where(Comision.anio == anio)
+    return list(db.execute(stmt).scalars().all())
+
+
 def cursadas_para_materias(
     db: Session,
     *,

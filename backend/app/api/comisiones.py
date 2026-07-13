@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.comision import (
+    ComisionOut,
     MateriaCursableOut,
     OptimizacionOut,
     OptimizarHorarioIn,
@@ -41,6 +42,21 @@ def optimizar_horario(
         dia_libre=payload.dia_libre,
         turno=payload.turno,
     )
+
+
+@router.get(
+    "/comisiones/con-profesores",
+    response_model=list[ComisionOut],
+    summary="Comisiones (por año) con materias, profesor resuelto y horarios",
+)
+def comisiones_con_profesores(
+    db: Annotated[Session, Depends(get_db)],
+    anio: int | None = Query(None, description="Filtra por año de comisión; None = todas"),
+) -> list[ComisionOut]:
+    """Comisiones con sus materias, el profesor real resuelto (o None → la UI usa
+    el apellido ``docente``) y los horarios. Alimenta la vista `/comisiones`.
+    """
+    return comision_service.comisiones_con_profesores(db, anio=anio)
 
 
 @router.get(

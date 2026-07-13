@@ -297,3 +297,32 @@ export interface ResultadoSincCatedras {
   asignaturas_no_mapeadas: string[];
   errores: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Comisiones con profesores — refleja el endpoint GET /comisiones/con-profesores
+// (schemas/comision.py: ComisionOut / CursadaOut + ProfesorMiniOut). Reutiliza
+// HorarioOut, ya definido para el armador de horarios.
+// ---------------------------------------------------------------------------
+
+export interface ProfesorMini {
+  id: number;
+  nombre: string | null;
+}
+
+export interface CursadaConProfesor {
+  id: number;
+  materia_codigo: string;
+  materia_nombre: string | null;
+  cuatrimestre: number | null;
+  docente: string | null;
+  /** Profesor real resuelto; null si ambiguo/sin match (se cae al docente). */
+  profesor: ProfesorMini | null;
+  horarios: HorarioOut[];
+}
+
+export interface ComisionConProfesores {
+  id: number;
+  nombre: string | null;
+  anio: number | null;
+  cursadas: CursadaConProfesor[];
+}
