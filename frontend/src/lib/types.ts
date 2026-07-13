@@ -326,3 +326,38 @@ export interface ComisionConProfesores {
   anio: number | null;
   cursadas: CursadaConProfesor[];
 }
+
+// ---------------------------------------------------------------------------
+// Novedades - refleja `app/schemas/novedad.py`
+// ---------------------------------------------------------------------------
+
+export type CategoriaNovedad = "evento" | "aviso" | "noticia" | "general";
+export type FuenteNovedad = "instagram" | "utn_web";
+export type EstadoNovedad = "publicada" | "pendiente" | "descartada";
+
+export interface CentroOut {
+  handle: string;
+  nombre: string;
+  tipo: FuenteNovedad | string;
+  url_perfil: string | null;
+  logo_url: string | null;
+}
+
+export interface FuenteOut {
+  centro: CentroOut;
+  url: string | null;
+}
+
+export interface NovedadOut {
+  id: number;
+  titulo: string | null;
+  descripcion: string | null;
+  contenido: string | null;
+  imagen_url: string | null;
+  categoria: CategoriaNovedad | string | null;
+  estado: EstadoNovedad;
+  confianza: number | null;
+  fecha_publicacion: string | null;
+  created_at: string | null;
+  fuentes: FuenteOut[];
+}

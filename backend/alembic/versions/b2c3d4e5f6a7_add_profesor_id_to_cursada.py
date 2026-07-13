@@ -1,8 +1,12 @@
 """add profesor_id to cursada
 
 Revision ID: b2c3d4e5f6a7
-Revises: c1d2e3f4a5b6
+Revises: b3e8f1c2a9d7
 Create Date: 2026-07-13
+
+Nota: originalmente forkeaba de c1d2e3f4a5b6, igual que la cadena de novedades
+(e7c3f1a9b204 → a1f7c2d3e4b5 → b3e8f1c2a9d7). Al mergear novedades quedaban dos
+heads; se reencadena esta migración sobre b3e8f1c2a9d7 para tener un head lineal.
 """
 from __future__ import annotations
 
@@ -10,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "b2c3d4e5f6a7"
-down_revision: str = "c1d2e3f4a5b6"
+down_revision: str = "b3e8f1c2a9d7"
 branch_labels = None
 depends_on = None
 

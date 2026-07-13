@@ -1,0 +1,236 @@
+"""Repository de novedades: centros, fuentes e ingesta_log."""
+from __future__ import annotations
+
+from collections.abc import Iterable, Sequence
+from datetime import datetime
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, joinedload, selectinload
+
+from app.db.models.novedad import Centro, IngestaLog, Novedad, NovedadFuente
+
+
+def get_or_create_centro(
+    db: Session,
+    *,
+    handle: str,
+    nombre: str,
+    tipo: str,
+    url_perfil: str | None = None,
+    logo_url: str | None = None,
+) -> Centro:
+    centro = db.execute(
+        select(Centro).where(Centro.handle == handle)
+    ).scalar_one_or_none()
+    if centro is not None:
+        return centro
+    centro = Centro(
+        handle=handle,
+        nombre=nombre,
+        tipo=tipo,
+        url_perfil=url_perfil,
+        logo_url=logo_url,
+    )
+    db.add(centro)
+    db.flush()
+    return centro
+
+
+def external_ids_existentes(
+    db: Session, external_ids: Iterable[str]
+) -> set[str]:
+    """De los ``external_ids`` dados, cuáles ya están registrados (dedup exacto)."""
+    ids = [eid for eid in external_ids if eid]
+    if not ids:
+        return set()
+    stmt = select(NovedadFuente.external_id).where(
+        NovedadFuente.external_id.in_(ids)
+    )
+    return {row[0] for row in db.execute(stmt).all()}
+
+
+def crear_novedad(
+    db: Session,
+    *,
+    centro: Centro,
+    external_id: str,
+    fuente_url: str | None,
+    fuente_imagen_url: str | None,
+    fuente_imagen_path: str | None,
+    titulo: str | None,
+    descripcion: str | None,
+    contenido: str | None = None,
+    categoria: str | None,
+    imagen_url: str | None,
+    imagen_path: str | None,
+    estado: str,
+    confianza: float | None,
+    motivo_descarte: str | None,
+    fecha_publicacion: datetime | None,
+) -> Novedad:
+    """Crea una novedad canónica + su primera fuente. Hace flush (no commit)."""
+    novedad = Novedad(
+        titulo=titulo,
+        descripcion=descripcion,
+        contenido=contenido,
+        categoria=categoria,
+        imagen_url=imagen_url,
+        imagen_path=imagen_path,
+        estado=estado,
+        confianza=confianza,
+        motivo_descarte=motivo_descarte,
+        fecha_publicacion=fecha_publicacion,
+    )
+    db.add(novedad)
+    db.flush()
+    agregar_fuente(
+        db,
+        novedad=novedad,
+        centro=centro,
+        external_id=external_id,
+        url=fuente_url,
+        imagen_url=fuente_imagen_url,
+        imagen_path=fuente_imagen_path,
+        fecha_publicacion=fecha_publicacion,
+    )
+    return novedad
+
+
+def agregar_fuente(
+    db: Session,
+    *,
+    novedad: Novedad,
+    centro: Centro,
+    external_id: str,
+    url: str | None,
+    imagen_url: str | None,
+    imagen_path: str | None,
+    fecha_publicacion: datetime | None,
+) -> NovedadFuente:
+    """Suma una fuente a una novedad existente (dedup Fase 2). Hace flush."""
+    fuente = NovedadFuente(
+        novedad_id=novedad.id,
+        centro_id=centro.id,
+        external_id=external_id,
+        url=url,
+        imagen_url=imagen_url,
+        imagen_path=imagen_path,
+        fecha_publicacion=fecha_publicacion,
+    )
+    db.add(fuente)
+    db.flush()
+    return fuente
+
+
+def listar(
+    db: Session,
+    *,
+    categoria: str | None = None,
+    estado: str | None = "publicada",
+    centro: str | None = None,
+    limite: int = 20,
+    offset: int = 0,
+) -> Sequence[Novedad]:
+    """Novedades (con fuentes y centros) ordenadas por fecha del evento/posteo desc.
+
+    Usa ``fecha_publicacion`` (fecha real del contenido) y no ``created_at``
+    (fecha de ingesta): sin esto, contenido viejo recién ingestado (ej. un
+    backfill de posts de IG de 2023) se mezclaba con lo genuinamente nuevo.
+    Cae a ``created_at`` cuando la fuente no expone fecha (ej. notas web).
+    """
+    orden = func.coalesce(Novedad.fecha_publicacion, Novedad.created_at)
+    stmt = select(Novedad)
+    if categoria is not None:
+        stmt = stmt.where(Novedad.categoria == categoria)
+    if estado is not None:
+        stmt = stmt.where(Novedad.estado == estado)
+    if centro is not None:
+        stmt = stmt.where(
+            Novedad.id.in_(
+                select(NovedadFuente.novedad_id)
+                .join(Centro, Centro.id == NovedadFuente.centro_id)
+                .where(Centro.handle == centro)
+            )
+        )
+    stmt = (
+        stmt.options(selectinload(Novedad.fuentes).joinedload(NovedadFuente.centro))
+        .order_by(orden.desc().nullslast(), Novedad.id.desc())
+        .limit(limite)
+        .offset(offset)
+    )
+    return db.execute(stmt).scalars().all()
+
+
+def listar_centros(db: Session) -> Sequence[Centro]:
+    """Centros con al menos una novedad publicada (insumo del filtro por fuente)."""
+    stmt = (
+        select(Centro)
+        .join(NovedadFuente, NovedadFuente.centro_id == Centro.id)
+        .join(Novedad, Novedad.id == NovedadFuente.novedad_id)
+        .where(Novedad.estado == "publicada")
+        .distinct()
+        .order_by(Centro.nombre)
+    )
+    return db.execute(stmt).scalars().all()
+
+
+def recientes_para_dedup(db: Session, *, limite: int = 30) -> Sequence[Novedad]:
+    """Últimas novedades no descartadas, como contexto de dedup semántico."""
+    stmt = (
+        select(Novedad)
+        .where(Novedad.estado != "descartada")
+        .order_by(Novedad.created_at.desc().nullslast(), Novedad.id.desc())
+        .limit(limite)
+    )
+    return db.execute(stmt).scalars().all()
+
+
+def get(db: Session, novedad_id: int) -> Novedad | None:
+    stmt = (
+        select(Novedad)
+        .where(Novedad.id == novedad_id)
+        .options(selectinload(Novedad.fuentes).joinedload(NovedadFuente.centro))
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def actualizar_estado(
+    db: Session, novedad_id: int, estado: str
+) -> Novedad | None:
+    novedad = db.get(Novedad, novedad_id)
+    if novedad is None:
+        return None
+    novedad.estado = estado
+    db.flush()
+    return novedad
+
+
+def crear_ingesta_log(
+    db: Session,
+    *,
+    fuente: str,
+    iniciado_en: datetime,
+    finalizado_en: datetime,
+    items_vistos: int,
+    items_nuevos: int,
+    items_novedad: int,
+    items_descartados: int,
+    tokens_usados: int | None,
+    estado: str,
+    errores: list[str] | None,
+) -> IngestaLog:
+    log = IngestaLog(
+        fuente=fuente,
+        iniciado_en=iniciado_en,
+        finalizado_en=finalizado_en,
+        items_vistos=items_vistos,
+        items_nuevos=items_nuevos,
+        items_novedad=items_novedad,
+        items_descartados=items_descartados,
+        tokens_usados=tokens_usados,
+        estado=estado,
+        errores="\n".join(errores) if errores else None,
+    )
+    db.add(log)
+    db.flush()
+    return log

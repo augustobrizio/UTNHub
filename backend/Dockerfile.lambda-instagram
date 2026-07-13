@@ -1,0 +1,11 @@
+# Imagen de la Lambda de ingesta de Instagram. Ver Dockerfile.lambda-utn-web
+# para la explicacion general del patron (base de Lambda = Amazon Linux,
+# pip install adentro para binarios compatibles).
+FROM public.ecr.aws/lambda/python:3.12
+
+COPY requirements-lambda-instagram.txt ${LAMBDA_TASK_ROOT}/requirements.txt
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+
+COPY app ${LAMBDA_TASK_ROOT}/app
+
+CMD ["app.lambda_handlers.ingesta_instagram.handler"]

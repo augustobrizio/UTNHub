@@ -6,14 +6,18 @@
  * momento sumamos client-side fetching pesado, vemos.
  */
 import type {
+  CategoriaNovedad,
+  CentroOut,
   ConfirmarImportIn,
   CriterioOptimizacion,
   ComisionConProfesores,
   EventoCalendarioCreate,
   EventoCalendarioOut,
+  FuenteNovedad,
   GrafoResponse,
   MateriaCursableOut,
   MateriaOut,
+  NovedadOut,
   OptimizacionOut,
   PreviewImportSysacad,
   ProfesorDetalleOut,
@@ -136,6 +140,37 @@ export function getEventosHoyCalendario(
   return request<EventoCalendarioOut[]>(`/calendario/hoy?${qs.toString()}`, {
     revalidate: 30,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Endpoints de novedades
+// ---------------------------------------------------------------------------
+
+export interface NovedadesParams {
+  fuente?: FuenteNovedad;
+  categoria?: CategoriaNovedad;
+  centro?: string;
+  limite?: number;
+}
+
+export function listarNovedades(
+  params: NovedadesParams = {},
+): Promise<NovedadOut[]> {
+  const qs = new URLSearchParams();
+  if (params.fuente) qs.set("fuente", params.fuente);
+  if (params.categoria) qs.set("categoria", params.categoria);
+  if (params.centro) qs.set("centro", params.centro);
+  if (params.limite) qs.set("limite", String(params.limite));
+  const query = qs.toString();
+  // El feed lo alimenta el scheduler por detras; con revalidar cada pocos
+  // minutos alcanza.
+  return request<NovedadOut[]>(`/novedades${query ? `?${query}` : ""}`, {
+    revalidate: 180,
+  });
+}
+
+export function listarCentros(): Promise<CentroOut[]> {
+  return request<CentroOut[]>("/novedades/centros", { revalidate: 180 });
 }
 
 // Las mutaciones se enrutan via /api/backend (proxy Next.js) para evitar CORS en browser.
@@ -442,6 +477,8 @@ export const api = {
   listarEventosCalendario,
   getProximosEventosCalendario,
   getEventosHoyCalendario,
+  listarNovedades,
+  listarCentros,
   registrarEstado,
   eliminarEstado,
   resetearTodosRegistros,
