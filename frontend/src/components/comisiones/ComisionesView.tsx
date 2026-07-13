@@ -10,10 +10,23 @@ import { useMemo, useState } from "react";
 import type { ComisionConProfesores } from "@/lib/types";
 import { ComisionCard } from "./ComisionCard";
 
+/**
+ * Año de carrera de una comisión, derivado del nombre (ej. "1K01" → 1,
+ * "3EK02" → 3). `Comision.anio` guarda el año académico (2025), no el de
+ * carrera, así que para segmentar usamos el número inicial del nombre.
+ */
+function anioDeComision(c: ComisionConProfesores): number | null {
+  const m = (c.nombre ?? "").match(/\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
 export function ComisionesView({ comisiones }: { comisiones: ComisionConProfesores[] }) {
   const anios = useMemo(() => {
     const s = new Set<number>();
-    for (const c of comisiones) if (c.anio != null) s.add(c.anio);
+    for (const c of comisiones) {
+      const a = anioDeComision(c);
+      if (a != null) s.add(a);
+    }
     return [...s].sort((a, b) => a - b);
   }, [comisiones]);
 
@@ -21,10 +34,10 @@ export function ComisionesView({ comisiones }: { comisiones: ComisionConProfesor
 
   const grupos = useMemo(() => {
     const filtradas =
-      anioSel == null ? comisiones : comisiones.filter((c) => c.anio === anioSel);
+      anioSel == null ? comisiones : comisiones.filter((c) => anioDeComision(c) === anioSel);
     const map = new Map<number | null, ComisionConProfesores[]>();
     for (const c of filtradas) {
-      const k = c.anio ?? null;
+      const k = anioDeComision(c);
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(c);
     }
