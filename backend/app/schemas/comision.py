@@ -38,6 +38,10 @@ class CursadaOut(BaseModel):
     # Profesor real resuelto (None si el docente fue ambiguo o no matcheo).
     # Se conserva ``docente`` como fallback.
     profesor: ProfesorMiniOut | None = None
+    # Reseña (profesor×materia) desde UTNTAC. Null si no hay reseña.
+    nota: float | None = None  # 1–5 (promedio ponderado de votos)
+    clasificacion: str | None = None  # p.ej. "Super Recomendado"
+    cantidad_respuestas: int | None = None
     horarios: list[HorarioOut] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -47,6 +51,11 @@ class ComisionOut(BaseModel):
     id: int
     nombre: str | None
     anio: int | None
+    # Score de la comisión: promedio de las notas de sus cátedras con reseña.
+    # Null si ninguna la tiene. ``score_con_review``/``score_total`` = cobertura.
+    score: float | None = None
+    score_con_review: int = 0
+    score_total: int = 0
     cursadas: list[CursadaOut] = []
 
     model_config = ConfigDict(from_attributes=True)

@@ -53,13 +53,58 @@ def _limpiar_nombre(nombre: str) -> str:
     return " ".join(sin_sufijo.split())
 
 
+# Índices de columnas de reseña en el CSV de UTNTAC.
+_COL_CLASIFICACION = 3
+_COL_CANTIDAD = 11
+_COL_SUPER_RECOMIENDO = 12
+_COL_RECOMIENDO = 13
+_COL_NORMAL = 14
+_COL_EVITARIA = 15
+_COL_SUPER_EVITARIA = 16
+
+
+def _int_col(row: list[str], idx: int) -> int:
+    """Lee una columna numérica del CSV; 0 si falta o no parsea."""
+    if idx >= len(row):
+        return 0
+    try:
+        return int(float(str(row[idx]).strip() or 0))
+    except (ValueError, TypeError):
+        return 0
+
+
+def _txt_col(row: list[str], idx: int) -> str | None:
+    if idx >= len(row):
+        return None
+    val = str(row[idx]).strip()
+    return val or None
+
+
 @dataclass(frozen=True, slots=True)
 class CatedraDocente:
-    """Asociacion (asignatura, profesor) detectada en la sheet."""
+    """Asociacion (asignatura, profesor) + reseña detectada en la sheet."""
 
     anio: str | None
     asignatura: str
     nombre_profesor: str
+    # Reseña (votos + clasificación). Todo 0/None si la fila no la trae.
+    clasificacion: str | None = None
+    cantidad_respuestas: int = 0
+    super_recomiendo: int = 0
+    recomiendo: int = 0
+    normal: int = 0
+    evitaria: int = 0
+    super_evitaria: int = 0
+
+    @property
+    def total_votos(self) -> int:
+        return (
+            self.super_recomiendo
+            + self.recomiendo
+            + self.normal
+            + self.evitaria
+            + self.super_evitaria
+        )
 
 
 def fetch_csv(url: str = URL_SHEET_CATEDRAS) -> str:
@@ -134,6 +179,13 @@ def parsear_csv(texto: str) -> list[CatedraDocente]:
                 anio=ultimo_anio,
                 asignatura=ultima_asig,
                 nombre_profesor=prof_limpio,
+                clasificacion=_txt_col(row, _COL_CLASIFICACION),
+                cantidad_respuestas=_int_col(row, _COL_CANTIDAD),
+                super_recomiendo=_int_col(row, _COL_SUPER_RECOMIENDO),
+                recomiendo=_int_col(row, _COL_RECOMIENDO),
+                normal=_int_col(row, _COL_NORMAL),
+                evitaria=_int_col(row, _COL_EVITARIA),
+                super_evitaria=_int_col(row, _COL_SUPER_EVITARIA),
             )
         )
 

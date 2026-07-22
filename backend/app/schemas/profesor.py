@@ -122,6 +122,12 @@ class ResultadoSincCatedras(BaseModel):
     materia_profesor_ya_existentes: int = Field(
         ..., description="Asociaciones que ya estaban en la DB; no se duplican"
     )
+    reviews_creadas: int = Field(
+        default=0, description="Reseñas (profesor×materia) nuevas insertadas"
+    )
+    reviews_actualizadas: int = Field(
+        default=0, description="Reseñas existentes actualizadas"
+    )
     asignaturas_no_mapeadas: list[str] = Field(
         default_factory=list,
         description=(

@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.db.models.academico import CondicionMateria, Cursada, Materia, UsuarioMateria
-from app.repositories import comision_repo, materia_repo
+from app.repositories import comision_repo, materia_repo, review_repo
+from app.services import review_service
 from app.schemas.comision import (
     AsignacionOut,
     ComisionCursadaOut,
@@ -34,9 +35,11 @@ def comisiones_con_profesores(
     o sin match); la UI cae entonces al ``docente`` (apellido crudo).
     """
     comisiones = comision_repo.listar_comisiones_con_profesor(db, anio=anio)
+    reviews = review_repo.reviews_por_par(db)  # {(materia_codigo, profesor_id): ReviewCatedra}
     salida: list[ComisionOut] = []
     for com in comisiones:
         cursadas_out: list[CursadaOut] = []
+        notas_comision: list[float | None] = []
         # Deduplicar: las materias anuales las carga el seed en ambos
         # cuatrimestres con horario idéntico. Colapsamos por (materia, horario)
         # para que cada materia aparezca una sola vez.
@@ -55,6 +58,15 @@ def comisiones_con_profesores(
             if clave in vistos:
                 continue
             vistos.add(clave)
+
+            review = (
+                reviews.get((cur.materia_codigo, cur.profesor.id))
+                if cur.profesor is not None
+                else None
+            )
+            nota = review_service.nota_catedra(review)
+            notas_comision.append(nota)
+
             cursadas_out.append(
                 CursadaOut(
                     id=cur.id,
@@ -68,6 +80,11 @@ def comisiones_con_profesores(
                         if cur.profesor is not None
                         else None
                     ),
+                    nota=nota,
+                    clasificacion=review.clasificacion if review is not None else None,
+                    cantidad_respuestas=(
+                        review.cantidad_respuestas if review is not None else None
+                    ),
                     horarios=[
                         HorarioOut(
                             dia=h.dia,
@@ -79,9 +96,16 @@ def comisiones_con_profesores(
                     ],
                 )
             )
+        sc = review_service.score_comision(notas_comision)
         salida.append(
             ComisionOut(
-                id=com.id, nombre=com.nombre, anio=com.anio, cursadas=cursadas_out
+                id=com.id,
+                nombre=com.nombre,
+                anio=com.anio,
+                score=sc.score,
+                score_con_review=sc.con_review,
+                score_total=sc.total,
+                cursadas=cursadas_out,
             )
         )
     return salida

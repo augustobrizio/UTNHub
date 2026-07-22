@@ -24,7 +24,7 @@ from rapidfuzz import fuzz, process, utils
 from sqlalchemy.orm import Session
 
 from app.db.models.profesor import Profesor
-from app.repositories import materia_repo, profesor_repo
+from app.repositories import materia_repo, profesor_repo, review_repo
 from app.schemas.profesor import ResultadoSincCatedras, ResultadoSincMails
 from app.scrapers import profesores_utntac_catedras as scraper_catedras
 from app.scrapers import profesores_utntac_mails as scraper_mails
@@ -152,10 +152,13 @@ def sincronizar_catedras(db: Session) -> ResultadoSincCatedras:
     indice = _indice_profesores_por_nombre(db)
     materias = materia_repo.list_materias(db)
     opciones = {m.nombre: m.codigo for m in materias}
+    reviews_idx = review_repo.reviews_por_par(db)  # precarga: evita SELECT por fila
 
     profesores_creados = 0
     materia_profesor_creados = 0
     materia_profesor_ya_existentes = 0
+    reviews_creadas = 0
+    reviews_actualizadas = 0
     asignaturas_no_mapeadas: set[str] = set()
     errores: list[str] = []
 
@@ -184,6 +187,26 @@ def sincronizar_catedras(db: Session) -> ResultadoSincCatedras:
                     db, materia_codigo=codigo, profesor_id=prof.id
                 )
                 materia_profesor_creados += 1
+
+            # Reseña: upsert solo si la fila trae votos.
+            if item.total_votos > 0:
+                creada = review_repo.upsert_review(
+                    db,
+                    materia_codigo=codigo,
+                    profesor_id=prof.id,
+                    clasificacion=item.clasificacion,
+                    cantidad_respuestas=item.cantidad_respuestas,
+                    super_recomiendo=item.super_recomiendo,
+                    recomiendo=item.recomiendo,
+                    normal=item.normal,
+                    evitaria=item.evitaria,
+                    super_evitaria=item.super_evitaria,
+                    cache=reviews_idx,
+                )
+                if creada:
+                    reviews_creadas += 1
+                else:
+                    reviews_actualizadas += 1
         except Exception as e:  # noqa: BLE001
             logger.warning(
                 "Error procesando %s / %s: %s",
@@ -198,6 +221,8 @@ def sincronizar_catedras(db: Session) -> ResultadoSincCatedras:
         profesores_creados=profesores_creados,
         materia_profesor_creados=materia_profesor_creados,
         materia_profesor_ya_existentes=materia_profesor_ya_existentes,
+        reviews_creadas=reviews_creadas,
+        reviews_actualizadas=reviews_actualizadas,
         asignaturas_no_mapeadas=sorted(asignaturas_no_mapeadas),
         errores=errores,
     )
