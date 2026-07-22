@@ -232,3 +232,132 @@ export interface ResultadoSincCalendario {
   advertencias: string[];
   errores: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Dominio profesores — refleja `app/schemas/profesor.py`
+// ---------------------------------------------------------------------------
+
+export interface ProfesorListItem {
+  id: number;
+  nombre: string | null;
+  email: string | null;
+  cantidad_materias: number;
+  cantidad_horarios: number;
+}
+
+export interface HorarioConsultaOut {
+  id: number;
+  profesor_id: number;
+  dia: string | null;
+  hora_inicio: string | null; // "HH:MM:SS"
+  hora_fin: string | null;    // "HH:MM:SS"
+  modalidad: string | null;
+  aula: string | null;
+}
+
+export interface MateriaProfesorOut {
+  materia_codigo: string;
+  materia_nombre: string | null;
+  cargo: string | null;
+  anio: number | null;
+}
+
+export interface ProfesorDetalleOut {
+  id: number;
+  nombre: string | null;
+  email: string | null;
+  materias: MateriaProfesorOut[];
+  horarios_consulta: HorarioConsultaOut[];
+}
+
+export interface ResultadoSincHorarios {
+  profesores_tocados: number;
+  horarios_borrados: number;
+  horarios_creados: number;
+  materia_profesor_borrados: number;
+  materia_profesor_creados: number;
+  advertencias: string[];
+  errores: string[];
+}
+
+export interface ResultadoSincMails {
+  filas_procesadas: number;
+  emails_seteados: number;
+  emails_ya_existentes: number;
+  profesores_creados: number;
+  advertencias: string[];
+  errores: string[];
+}
+
+export interface ResultadoSincCatedras {
+  filas_procesadas: number;
+  profesores_creados: number;
+  materia_profesor_creados: number;
+  materia_profesor_ya_existentes: number;
+  asignaturas_no_mapeadas: string[];
+  errores: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Comisiones con profesores — refleja el endpoint GET /comisiones/con-profesores
+// (schemas/comision.py: ComisionOut / CursadaOut + ProfesorMiniOut). Reutiliza
+// HorarioOut, ya definido para el armador de horarios.
+// ---------------------------------------------------------------------------
+
+export interface ProfesorMini {
+  id: number;
+  nombre: string | null;
+}
+
+export interface CursadaConProfesor {
+  id: number;
+  materia_codigo: string;
+  materia_nombre: string | null;
+  cuatrimestre: number | null;
+  docente: string | null;
+  /** Profesor real resuelto; null si ambiguo/sin match (se cae al docente). */
+  profesor: ProfesorMini | null;
+  horarios: HorarioOut[];
+}
+
+export interface ComisionConProfesores {
+  id: number;
+  nombre: string | null;
+  anio: number | null;
+  cursadas: CursadaConProfesor[];
+}
+
+// ---------------------------------------------------------------------------
+// Novedades - refleja `app/schemas/novedad.py`
+// ---------------------------------------------------------------------------
+
+export type CategoriaNovedad = "evento" | "aviso" | "noticia" | "general";
+export type FuenteNovedad = "instagram" | "utn_web";
+export type EstadoNovedad = "publicada" | "pendiente" | "descartada";
+
+export interface CentroOut {
+  handle: string;
+  nombre: string;
+  tipo: FuenteNovedad | string;
+  url_perfil: string | null;
+  logo_url: string | null;
+}
+
+export interface FuenteOut {
+  centro: CentroOut;
+  url: string | null;
+}
+
+export interface NovedadOut {
+  id: number;
+  titulo: string | null;
+  descripcion: string | null;
+  contenido: string | null;
+  imagen_url: string | null;
+  categoria: CategoriaNovedad | string | null;
+  estado: EstadoNovedad;
+  confianza: number | null;
+  fecha_publicacion: string | null;
+  created_at: string | null;
+  fuentes: FuenteOut[];
+}

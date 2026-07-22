@@ -3,6 +3,35 @@
 @tailwind utilities;
 
 /* =====================================================================
+ * Shell "Vercel × UTN" (Sidebar/TopNav/Novedades) — tokens light/dark.
+ * Namespace propio (--shell-*), separado de los tokens de Kinetic
+ * Blueprint (surface/on-surface) que usan las paginas viejas del grafo,
+ * materias y calendario — esas siguen dark-only, sin tocar.
+ * ===================================================================*/
+
+:root {
+  --shell-canvas: #fafafa;
+  --shell-panel: #ffffff;
+  --shell-border: rgba(0, 0, 0, 0.08);
+  --shell-hover: rgba(0, 0, 0, 0.04);
+  --shell-fg: #171717;
+  --shell-fg-muted: #525252;
+  --shell-fg-dim: #a3a3a3;
+  --shell-accent-fg: #0e7fb0;
+}
+
+.dark {
+  --shell-canvas: #09090b;
+  --shell-panel: #0c0c0e;
+  --shell-border: rgba(255, 255, 255, 0.07);
+  --shell-hover: rgba(255, 255, 255, 0.04);
+  --shell-fg: #fafafa;
+  --shell-fg-muted: #a3a3a3;
+  --shell-fg-dim: #737373;
+  --shell-accent-fg: #4ec0ec;
+}
+
+/* =====================================================================
  * Kinetic Blueprint — base styles
  * ===================================================================*/
 

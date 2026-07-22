@@ -13,12 +13,16 @@ from __future__ import annotations
 
 import enum
 from datetime import time
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import Float, ForeignKey, Integer, Text, Time, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.db.models.profesor import Profesor
 
 
 # ---------------------------------------------------------------------------
@@ -207,9 +211,17 @@ class Cursada(Base):
     )
     cuatrimestre: Mapped[int | None] = mapped_column(Integer, nullable=True)
     docente: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Vinculo resuelto al profesor real del padron (ver cursada_profesor_service).
+    # Nullable: el ``docente`` (apellido crudo) no siempre resuelve a un unico
+    # profesor. Se conserva ``docente`` como fallback/provenance. ON DELETE SET
+    # NULL: si se borra el profesor, la cursada sigue existiendo sin vinculo.
+    profesor_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("profesor.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     comision: Mapped[Comision] = relationship(back_populates="cursadas")
     materia: Mapped[Materia] = relationship()
+    profesor: Mapped["Profesor | None"] = relationship()
     horarios: Mapped[list["Horario"]] = relationship(
         back_populates="cursada", cascade="all, delete-orphan"
     )

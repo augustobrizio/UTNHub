@@ -6,17 +6,27 @@
  * momento sumamos client-side fetching pesado, vemos.
  */
 import type {
+  CategoriaNovedad,
+  CentroOut,
   ConfirmarImportIn,
   CriterioOptimizacion,
+  ComisionConProfesores,
   EventoCalendarioCreate,
   EventoCalendarioOut,
+  FuenteNovedad,
   GrafoResponse,
   MateriaCursableOut,
   MateriaOut,
+  NovedadOut,
   OptimizacionOut,
   PreviewImportSysacad,
+  ProfesorDetalleOut,
+  ProfesorListItem,
   ResultadoImportSysacad,
   ResultadoSincCalendario,
+  ResultadoSincCatedras,
+  ResultadoSincHorarios,
+  ResultadoSincMails,
   TipoEventoCalendario,
   TipoMateria,
   TurnoPref,
@@ -130,6 +140,37 @@ export function getEventosHoyCalendario(
   return request<EventoCalendarioOut[]>(`/calendario/hoy?${qs.toString()}`, {
     revalidate: 30,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Endpoints de novedades
+// ---------------------------------------------------------------------------
+
+export interface NovedadesParams {
+  fuente?: FuenteNovedad;
+  categoria?: CategoriaNovedad;
+  centro?: string;
+  limite?: number;
+}
+
+export function listarNovedades(
+  params: NovedadesParams = {},
+): Promise<NovedadOut[]> {
+  const qs = new URLSearchParams();
+  if (params.fuente) qs.set("fuente", params.fuente);
+  if (params.categoria) qs.set("categoria", params.categoria);
+  if (params.centro) qs.set("centro", params.centro);
+  if (params.limite) qs.set("limite", String(params.limite));
+  const query = qs.toString();
+  // El feed lo alimenta el scheduler por detras; con revalidar cada pocos
+  // minutos alcanza.
+  return request<NovedadOut[]>(`/novedades${query ? `?${query}` : ""}`, {
+    revalidate: 180,
+  });
+}
+
+export function listarCentros(): Promise<CentroOut[]> {
+  return request<CentroOut[]>("/novedades/centros", { revalidate: 180 });
 }
 
 // Las mutaciones se enrutan via /api/backend (proxy Next.js) para evitar CORS en browser.
@@ -361,12 +402,83 @@ export async function sincronizarCalendario(): Promise<ResultadoSincCalendario> 
   return res.json() as Promise<ResultadoSincCalendario>;
 }
 
+// ---------------------------------------------------------------------------
+// Comisiones (vista con profesores)
+// ---------------------------------------------------------------------------
+
+export function listarComisionesConProfesores(
+  anio?: number,
+): Promise<ComisionConProfesores[]> {
+  const qs = anio !== undefined ? `?anio=${anio}` : "";
+  return request<ComisionConProfesores[]>(`/comisiones/con-profesores${qs}`, {
+    revalidate: 30,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Profesores
+// ---------------------------------------------------------------------------
+
+export function listarProfesores(): Promise<ProfesorListItem[]> {
+  // revalidate corto: la lista cambia solo cuando corre una sincronizacion,
+  // y esas mutaciones invalidan el cache via router.refresh().
+  return request<ProfesorListItem[]>(`/profesores`, { revalidate: 30 });
+}
+
+export function getProfesorDetalle(id: number): Promise<ProfesorDetalleOut> {
+  return request<ProfesorDetalleOut>(`/profesores/${id}`, { revalidate: 30 });
+}
+
+/** Full refresh de horarios de consulta + catedras desde el sitio del Dpto. ISI. */
+export async function sincronizarHorariosProfesores(): Promise<ResultadoSincHorarios> {
+  const res = await fetch(`${MUTATION_BASE}/profesores/sincronizar-horarios`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<ResultadoSincHorarios>;
+}
+
+/** Enriquece emails de docentes desde la sheet publica de UTNTAC. */
+export async function sincronizarMailsProfesores(): Promise<ResultadoSincMails> {
+  const res = await fetch(`${MUTATION_BASE}/profesores/sincronizar-mails`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<ResultadoSincMails>;
+}
+
+/** Crea catedras (profesor<->materia) desde la sheet de recomendaciones de UTNTAC. */
+export async function sincronizarCatedrasUtntac(): Promise<ResultadoSincCatedras> {
+  const res = await fetch(`${MUTATION_BASE}/profesores/sincronizar-catedras-utntac`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<ResultadoSincCatedras>;
+}
+
 export const api = {
   getGrafo,
   listarMaterias,
   listarEventosCalendario,
   getProximosEventosCalendario,
   getEventosHoyCalendario,
+  listarNovedades,
+  listarCentros,
   registrarEstado,
   eliminarEstado,
   resetearTodosRegistros,
@@ -380,4 +492,10 @@ export const api = {
   seleccionarCursada,
   deseleccionarCursada,
   optimizarHorario,
+  listarProfesores,
+  getProfesorDetalle,
+  sincronizarHorariosProfesores,
+  sincronizarMailsProfesores,
+  sincronizarCatedrasUtntac,
+  listarComisionesConProfesores,
 };
