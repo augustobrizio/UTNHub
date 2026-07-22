@@ -1,7 +1,9 @@
 "use client";
 
 import type { ComisionConProfesores } from "@/lib/types";
+import { esComisionElectiva } from "@/lib/comision";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { ElectivaBadge } from "./ElectivaBadge";
 import { ScoreMock } from "./ScoreMock";
 import { ComisionModal } from "./ComisionModal";
 
@@ -15,6 +17,7 @@ export function ComisionCard({ comision }: { comision: ComisionConProfesores }) 
   const nProfes = new Set(
     comision.cursadas.filter((c) => c.profesor).map((c) => c.materia_codigo),
   ).size;
+  const electiva = esComisionElectiva(comision.nombre);
 
   return (
     <Dialog>
@@ -23,15 +26,18 @@ export function ComisionCard({ comision }: { comision: ComisionConProfesores }) 
           type="button"
           className="cal-card group w-full cursor-pointer rounded-2xl border border-outline-variant/10 bg-surface-container/60 p-4 text-left transition-colors hover:border-primary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
-              <span className="material-symbols-outlined text-[20px] text-primary">groups</span>
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
+              <span className="material-symbols-outlined text-[22px] text-primary">groups</span>
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="truncate font-headline text-base font-extrabold leading-tight text-on-surface">
-                {comision.nombre ?? "Comisión"}
-              </h3>
-              <p className="truncate text-[11px] text-outline">
+              <div className="flex items-center gap-2">
+                <h3 className="truncate font-headline text-base font-extrabold leading-tight text-on-surface">
+                  {comision.nombre ?? "Comisión"}
+                </h3>
+                {electiva && <ElectivaBadge />}
+              </div>
+              <p className="mt-0.5 truncate text-[11px] text-outline">
                 {nMaterias} {nMaterias === 1 ? "materia" : "materias"} · {nProfes} con profesor
               </p>
             </div>

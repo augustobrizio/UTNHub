@@ -1,5 +1,7 @@
 import type { ComisionConProfesores } from "@/lib/types";
+import { esComisionElectiva } from "@/lib/comision";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ElectivaBadge } from "./ElectivaBadge";
 import { MateriaComisionRow } from "./MateriaComisionRow";
 import { ScoreMock } from "./ScoreMock";
 
@@ -26,6 +28,7 @@ export function ComisionModal({ comision }: { comision: ComisionConProfesores })
     comision.cursadas.filter((c) => c.profesor).map((c) => c.materia_codigo),
   ).size;
   const anio = (comision.nombre ?? "").match(/\d+/)?.[0] ?? null;
+  const electiva = esComisionElectiva(comision.nombre);
 
   // Agrupar por el cuatrimestre REAL del plan (anual / 1 / 2 / "1 y 2"), no por
   // el 1/2 de la cursada — las materias anuales ya vienen deduplicadas.
@@ -60,6 +63,7 @@ export function ComisionModal({ comision }: { comision: ComisionConProfesores })
                 {anio}° año
               </span>
             )}
+            {electiva && <ElectivaBadge size="lg" />}
           </div>
           <DialogDescription className="mt-1 text-sm text-on-surface-variant">
             {nMaterias} {nMaterias === 1 ? "materia" : "materias"} · {nProfes} con profesor vinculado
