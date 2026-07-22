@@ -7,10 +7,17 @@ import { ScoreMock } from "./ScoreMock";
  * Cuerpo del modal de una comisión: header (nombre + año + score) y el detalle
  * completo de sus materias (materia + horario + profesor) en dos columnas.
  */
-function cuatriLabel(cuat: number | null): string {
-  if (cuat === 1) return "1.er cuatrimestre";
-  if (cuat === 2) return "2.º cuatrimestre";
-  return "Sin cuatrimestre";
+/** Etiqueta y orden del cuatrimestre real del plan (materia.cuatrimestre). */
+const CUATRI_LABEL: Record<string, string> = {
+  "1": "1.er cuatrimestre",
+  "2": "2.º cuatrimestre",
+  "1 y 2": "1.º y 2.º cuatrimestre",
+  anual: "Anual",
+};
+const CUATRI_ORDEN: Record<string, number> = { "1": 0, "2": 1, "1 y 2": 2, anual: 3 };
+
+function cuatriLabel(cuat: string | null): string {
+  return (cuat && CUATRI_LABEL[cuat]) ?? "Sin cuatrimestre";
 }
 
 export function ComisionModal({ comision }: { comision: ComisionConProfesores }) {
@@ -20,19 +27,19 @@ export function ComisionModal({ comision }: { comision: ComisionConProfesores })
   ).size;
   const anio = (comision.nombre ?? "").match(/\d+/)?.[0] ?? null;
 
-  // Agrupar por cuatrimestre: la misma materia aparece en 1º y 2º, así que
-  // segmentar deja claro que no son duplicados.
+  // Agrupar por el cuatrimestre REAL del plan (anual / 1 / 2 / "1 y 2"), no por
+  // el 1/2 de la cursada — las materias anuales ya vienen deduplicadas.
   const grupos = (() => {
-    const map = new Map<number | null, typeof comision.cursadas>();
+    const map = new Map<string | null, typeof comision.cursadas>();
     for (const c of comision.cursadas) {
-      const k = c.cuatrimestre ?? null;
+      const k = c.cuatrimestre_materia ?? null;
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(c);
     }
     return [...map.entries()].sort((a, b) => {
-      if (a[0] == null) return 1;
-      if (b[0] == null) return -1;
-      return a[0] - b[0];
+      const oa = a[0] == null ? 99 : (CUATRI_ORDEN[a[0]] ?? 98);
+      const ob = b[0] == null ? 99 : (CUATRI_ORDEN[b[0]] ?? 98);
+      return oa - ob;
     });
   })();
 

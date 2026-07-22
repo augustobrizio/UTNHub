@@ -36,35 +36,49 @@ def comisiones_con_profesores(
     comisiones = comision_repo.listar_comisiones_con_profesor(db, anio=anio)
     salida: list[ComisionOut] = []
     for com in comisiones:
-        cursadas_out = [
-            CursadaOut(
-                id=cur.id,
-                materia_codigo=cur.materia_codigo,
-                materia_nombre=cur.materia.nombre if cur.materia else None,
-                cuatrimestre=cur.cuatrimestre,
-                docente=cur.docente,
-                profesor=(
-                    ProfesorMiniOut(id=cur.profesor.id, nombre=cur.profesor.nombre)
-                    if cur.profesor is not None
-                    else None
-                ),
-                horarios=[
-                    HorarioOut(
-                        dia=h.dia,
-                        hora_inicio=h.hora_inicio,
-                        hora_fin=h.hora_fin,
-                        aula=h.aula,
-                    )
-                    for h in sorted(
-                        cur.horarios,
-                        key=lambda h: (h.dia or "", h.hora_inicio or time.min),
-                    )
-                ],
+        cursadas_out: list[CursadaOut] = []
+        # Deduplicar: las materias anuales las carga el seed en ambos
+        # cuatrimestres con horario idéntico. Colapsamos por (materia, horario)
+        # para que cada materia aparezca una sola vez.
+        vistos: set[tuple[str, tuple]] = set()
+        for cur in sorted(
+            com.cursadas, key=lambda c: (c.materia.nombre if c.materia else "")
+        ):
+            horarios_ord = sorted(
+                cur.horarios,
+                key=lambda h: (h.dia or "", h.hora_inicio or time.min),
             )
-            for cur in sorted(
-                com.cursadas, key=lambda c: (c.materia.nombre if c.materia else "")
+            clave = (
+                cur.materia_codigo,
+                tuple((h.dia, h.hora_inicio, h.hora_fin, h.aula) for h in horarios_ord),
             )
-        ]
+            if clave in vistos:
+                continue
+            vistos.add(clave)
+            cursadas_out.append(
+                CursadaOut(
+                    id=cur.id,
+                    materia_codigo=cur.materia_codigo,
+                    materia_nombre=cur.materia.nombre if cur.materia else None,
+                    cuatrimestre=cur.cuatrimestre,
+                    cuatrimestre_materia=cur.materia.cuatrimestre if cur.materia else None,
+                    docente=cur.docente,
+                    profesor=(
+                        ProfesorMiniOut(id=cur.profesor.id, nombre=cur.profesor.nombre)
+                        if cur.profesor is not None
+                        else None
+                    ),
+                    horarios=[
+                        HorarioOut(
+                            dia=h.dia,
+                            hora_inicio=h.hora_inicio,
+                            hora_fin=h.hora_fin,
+                            aula=h.aula,
+                        )
+                        for h in horarios_ord
+                    ],
+                )
+            )
         salida.append(
             ComisionOut(
                 id=com.id, nombre=com.nombre, anio=com.anio, cursadas=cursadas_out

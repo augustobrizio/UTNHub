@@ -314,6 +314,8 @@ export interface CursadaConProfesor {
   materia_codigo: string;
   materia_nombre: string | null;
   cuatrimestre: number | null;
+  /** Cuatrimestre real de la materia en el plan: "1" | "2" | "anual" | "1 y 2". */
+  cuatrimestre_materia: string | null;
   docente: string | null;
   /** Profesor real resuelto; null si ambiguo/sin match (se cae al docente). */
   profesor: ProfesorMini | null;

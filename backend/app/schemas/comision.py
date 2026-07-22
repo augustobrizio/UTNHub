@@ -30,6 +30,10 @@ class CursadaOut(BaseModel):
     materia_codigo: str
     materia_nombre: str | None = None
     cuatrimestre: int | None
+    # Cuatrimestre real de la materia en el plan: "1" | "2" | "anual" | "1 y 2".
+    # La vista de comisiones agrupa por este valor (no por el 1/2 de la cursada,
+    # que para materias anuales aparece cargado en ambos cuatrimestres).
+    cuatrimestre_materia: str | None = None
     docente: str | None = None
     # Profesor real resuelto (None si el docente fue ambiguo o no matcheo).
     # Se conserva ``docente`` como fallback.
