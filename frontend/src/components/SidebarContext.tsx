@@ -1,15 +1,24 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 /**
- * Estado de la sidebar. Son dos cosas distintas y no hay que mezclarlas:
+ * Estado de la sidebar. Son tres cosas distintas y no hay que mezclarlas:
  *
  * - `collapsed` es de escritorio: la barra sigue visible pero en 64px, y la
  *   preferencia se recuerda entre visitas.
  * - `mobileOpen` es del drawer: abajo de `lg` la barra sale de pantalla y se
  *   abre por encima del contenido. No se persiste — que una visita nueva
  *   arranque con el menu abierto tapando todo seria un bug, no una comodidad.
+ * - `editandoNav` es el modo "personalizar barra": qué módulos se muestran.
+ *   Lo dispara el menú de cuenta (otro componente), por eso vive acá y no
+ *   como estado local de la Sidebar.
  */
 interface SidebarCtx {
   collapsed: boolean;
@@ -17,6 +26,12 @@ interface SidebarCtx {
   mobileOpen: boolean;
   toggleMobile: () => void;
   closeMobile: () => void;
+  editandoNav: boolean;
+  /** Entra a personalizar: expande la barra (editar necesita los textos) y,
+   *  en mobile, abre el drawer. Recuerda cómo estaba para dejarlo igual al salir. */
+  iniciarPersonalizacion: () => void;
+  /** Sale de personalizar y restaura el colapso previo. */
+  terminarPersonalizacion: () => void;
 }
 
 const Ctx = createContext<SidebarCtx>({
@@ -25,6 +40,9 @@ const Ctx = createContext<SidebarCtx>({
   mobileOpen: false,
   toggleMobile: () => {},
   closeMobile: () => {},
+  editandoNav: false,
+  iniciarPersonalizacion: () => {},
+  terminarPersonalizacion: () => {},
 });
 
 const STORAGE_KEY = "utnhub.sidebar.collapsed";
@@ -32,6 +50,10 @@ const STORAGE_KEY = "utnhub.sidebar.collapsed";
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [editandoNav, setEditandoNav] = useState(false);
+  // Cómo estaba el colapso antes de entrar a personalizar, para restaurarlo al
+  // salir. En un ref y no en estado: no dispara render, sólo se lee al terminar.
+  const colapsadoPrevio = useRef(false);
 
   // Restaurar preferencia (solo cliente, evita mismatch de hidratación)
   useEffect(() => {
@@ -57,6 +79,21 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
+  // El expandir/colapsar de personalización NO se persiste (no toca STORAGE_KEY):
+  // es temporal mientras dura la edición, la preferencia real del usuario queda
+  // como estaba.
+  const iniciarPersonalizacion = () => {
+    colapsadoPrevio.current = collapsed;
+    setCollapsed(false);
+    setMobileOpen(true);
+    setEditandoNav(true);
+  };
+  const terminarPersonalizacion = () => {
+    setEditandoNav(false);
+    setMobileOpen(false);
+    if (colapsadoPrevio.current) setCollapsed(true);
+  };
+
   return (
     <Ctx.Provider
       value={{
@@ -65,6 +102,9 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
         mobileOpen,
         toggleMobile: () => setMobileOpen((o) => !o),
         closeMobile: () => setMobileOpen(false),
+        editandoNav,
+        iniciarPersonalizacion,
+        terminarPersonalizacion,
       }}
     >
       {children}

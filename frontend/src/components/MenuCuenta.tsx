@@ -11,7 +11,7 @@
  */
 
 import Link from "next/link";
-import { LogOut, User } from "lucide-react";
+import { LogOut, SlidersHorizontal, User } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSidebar } from "@/components/SidebarContext";
 import { useCerrarSesion } from "@/features/auth/useCerrarSesion";
 
 export interface UsuarioMenu {
@@ -35,6 +36,7 @@ export interface UsuarioMenu {
 
 export function MenuCuenta({ usuario }: { usuario: UsuarioMenu }) {
   const { salir, saliendo } = useCerrarSesion();
+  const { iniciarPersonalizacion } = useSidebar();
   // Una URL de foto puede romperse (link vencido de Google, sin red). Cuando
   // pasa, se cae a las iniciales en vez de dejar el hueco del `alt`.
   const [fotoRota, setFotoRota] = useState(false);
@@ -81,6 +83,17 @@ export function MenuCuenta({ usuario }: { usuario: UsuarioMenu }) {
             Perfil
           </Link>
         </DropdownMenuItem>
+
+        {/* Personalizar la barra lateral: prende el modo edición (mostrar/ocultar
+            módulos). Vive en el menú de cuenta y no como un botón fijo en la
+            barra, así la navegación no arrastra controles que no son módulos.
+            Al elegirlo Radix cierra el menú solo, que es lo que queremos. */}
+        <DropdownMenuItem onSelect={() => iniciarPersonalizacion()}>
+          <SlidersHorizontal className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+          Personalizar barra
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
 
         <DropdownMenuItem
           onSelect={(e) => {

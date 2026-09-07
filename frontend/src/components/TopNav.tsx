@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogIn, Menu, Moon, Sun } from "lucide-react";
+import { LogIn, Menu, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
@@ -53,7 +53,7 @@ function UtnLogo() {
 }
 
 export function TopNav({ usuario }: { usuario: UsuarioMenu | null }) {
-  const { collapsed, toggleMobile } = useSidebar();
+  const { collapsed, toggle, toggleMobile } = useSidebar();
 
   return (
     <BuscadorProvider>
@@ -105,6 +105,23 @@ export function TopNav({ usuario }: { usuario: UsuarioMenu | null }) {
             </p>
           </div>
         </div>
+
+        {/* Colapsar la barra lateral — sólo escritorio (en mobile la barra es
+            un drawer, con su propio botón hamburguesa). Vive acá, en el borde
+            del header —justo sobre el filo de la barra—, y ya no como una fila
+            más colgando de la navegación. El ícono se da vuelta según el estado. */}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={collapsed ? "Expandir menú lateral" : "Colapsar menú lateral"}
+          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--shell-fg-muted)] transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)] lg:flex"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          ) : (
+            <PanelLeftClose className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          )}
+        </button>
 
         {/* Buscador — abajo de `md` no entra la barra ancha: con el hamburger,
             el logo y las acciones desbordaba. Ahí el acceso es el botón de
