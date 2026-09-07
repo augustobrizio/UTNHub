@@ -14,6 +14,7 @@ from app.agent.tools.buscar_correlativas import crear_buscar_correlativas
 from app.agent.tools.buscar_horario_comision import crear_buscar_horario_comision
 from app.agent.tools.buscar_profesor import crear_buscar_profesor
 from app.agent.tools.ficha_materia import crear_ficha_materia
+from app.agent.tools.mesas_examen import crear_mesas_examen
 from app.agent.tools.mi_progreso import crear_mi_progreso
 from app.agent.tools.plan_estudio import crear_plan_de_estudio
 from app.agent.tools.proximos_eventos import crear_proximos_eventos
@@ -35,6 +36,7 @@ def construir_tools(
         crear_buscar_horario_comision(db),
         crear_buscar_profesor(db),
         crear_proximos_eventos(db, usuario_id),
+        crear_mesas_examen(db),
         crear_ultimas_novedades(db),
         crear_ficha_materia(db, recolector_fichas),
         crear_mi_progreso(db, usuario_id),

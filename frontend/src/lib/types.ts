@@ -235,6 +235,12 @@ export interface DiaCursada {
   detalle: string | null;
   /** "admin" o "agente" si el día tiene override; null si sale del calendario. */
   intervenido_por: string | null;
+  /**
+   * La mesa es *la* razón por la que ese día no se cursa. Lo decide el backend
+   * (un feriado encima de la mesa deja el día sin mesa); el panel lo usa para
+   * ofrecer qué materias se rinden.
+   */
+  es_mesa: boolean;
   eventos: EventoCalendarioOut[];
 }
 
@@ -245,6 +251,55 @@ export interface SemanaCursada {
   hoy: string;
   /** Lunes a viernes. */
   dias: DiaCursada[];
+}
+
+// ---------------------------------------------------------------------------
+// Mesas de examen
+// ---------------------------------------------------------------------------
+//
+// La mesa reparte las materias por día de la semana, no por fecha: el
+// calendario dice qué semana hay mesa, esto dice qué se rinde adentro.
+
+export type DiaMesa = "lunes" | "martes" | "miercoles" | "jueves" | "viernes";
+
+export interface MesaMateria {
+  materia_codigo: string;
+  dia_semana: DiaMesa;
+  /** "HH:MM:SS", o null si todavía no se confirmó el horario. */
+  hora: string | null;
+  /** Aclaración que dejó un admin para esa materia. */
+  nota: string | null;
+  /** "seed" (planilla del Departamento) o "admin" (corregido a mano). */
+  origen: string;
+  nombre: string;
+  anio_carrera: number | null;
+  tipo: string | null;
+}
+
+export interface DiaDeMesas {
+  dia_semana: DiaMesa;
+  materias: MesaMateria[];
+  total: number;
+  /**
+   * Sólo viene cuando se pide el día suelto (`/mesas/dia/...`): esa lista se
+   * muestra sin la semana alrededor, así que carga su propia advertencia.
+   */
+  aviso?: string;
+}
+
+export interface MesasSemana {
+  dias: DiaDeMesas[];
+  /** Materias del plan que todavía no tienen día cargado. */
+  sin_asignar: string[];
+  /** El dato es de referencia: hay que confirmarlo con la cátedra. */
+  aviso: string;
+}
+
+export interface MesaMateriaIn {
+  dia_semana: DiaMesa;
+  /** "HH:MM" o null. */
+  hora: string | null;
+  nota: string | null;
 }
 
 /** Override manual del estado de un día (admin). */

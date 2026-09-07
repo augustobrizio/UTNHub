@@ -578,3 +578,79 @@ def test_el_dia_sin_override_no_dice_estar_intervenido() -> None:
 
     assert dia.intervenido_por is None
     assert dia.detalle is None
+
+
+# ---------------------------------------------------------------------------
+# El día de mesa (lo que el panel usa para ofrecer qué se rinde)
+# ---------------------------------------------------------------------------
+#
+# `es_mesa` lo decide negocio y no el frontend mirando los eventos: es la misma
+# regla que apaga la cursada, y de ella depende que el panel muestre las
+# materias de esa mesa.
+
+
+def test_el_dia_con_mesa_de_la_facultad_queda_marcado_como_mesa() -> None:
+    db = _session()
+    _evento_sistema(
+        db, titulo="Mesa de Examen", dia=date(2026, 9, 8), tipo="mesa", hash_="m1"
+    )
+    db.commit()
+
+    semana = calendario_service.estado_semana(db, lunes=_LUNES)
+
+    assert semana.dias[1].es_mesa is True
+    assert semana.dias[1].se_cursa is False
+    assert semana.dias[0].es_mesa is False
+
+
+def test_un_final_que_se_anoto_el_alumno_no_convierte_el_dia_en_mesa() -> None:
+    """Que vos rindas no le pone mesa al día de todos los demás."""
+    db = _session()
+    calendario_repo.crear_evento_usuario(
+        db,
+        usuario_id=3,
+        titulo="Final de Analisis",
+        descripcion=None,
+        fecha_inicio=datetime(2026, 9, 9, 18, 0),
+        fecha_fin=None,
+        tipo="mesa",
+    )
+    db.commit()
+
+    dia = calendario_service.estado_semana(db, lunes=_LUNES, usuario_id=3).dias[2]
+
+    assert dia.es_mesa is False
+
+
+def test_si_el_admin_devuelve_la_cursada_el_dia_deja_de_ser_mesa() -> None:
+    """O la mesa se levantó o el calendario la marcó mal: no hay qué mostrar."""
+    db = _session()
+    _evento_sistema(
+        db, titulo="Mesa de Examen", dia=date(2026, 9, 8), tipo="mesa", hash_="m2"
+    )
+    calendario_service.definir_estado_dia(
+        db, fecha=date(2026, 9, 8), se_cursa=True, motivo=None, detalle=None, usuario_id=1
+    )
+    db.commit()
+
+    dia = calendario_service.estado_semana(db, lunes=_LUNES).dias[1]
+
+    assert dia.se_cursa is True
+    assert dia.es_mesa is False
+
+
+def test_un_feriado_encima_de_la_mesa_deja_el_dia_sin_mesa() -> None:
+    """El feriado le gana al motivo justamente porque ese día tampoco hay mesa."""
+    db = _session()
+    _evento_sistema(
+        db, titulo="Mesa de Examen", dia=date(2026, 9, 8), tipo="mesa", hash_="m3"
+    )
+    _evento_sistema(
+        db, titulo="Feriado nacional", dia=date(2026, 9, 8), tipo="feriado", hash_="f3"
+    )
+    db.commit()
+
+    dia = calendario_service.estado_semana(db, lunes=_LUNES).dias[1]
+
+    assert dia.motivo == "Feriado nacional"
+    assert dia.es_mesa is False

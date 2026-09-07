@@ -1,7 +1,7 @@
 """Modelos del dominio académico.
 
 Tablas: ``materia``, ``correlatividad``, ``usuario_materia``, ``comision``,
-``horario``. Refleja 1:1 el schema ya creado en Neon. No agregamos columnas.
+``horario``, ``mesa_materia``. Refleja 1:1 el schema ya creado en Neon.
 
 Convenciones:
 - Tipo de materia: ``"troncal"`` o ``"electiva"`` (string libre en DB).
@@ -12,11 +12,21 @@ Convenciones:
 from __future__ import annotations
 
 import enum
-from datetime import time
+from datetime import datetime, time
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Float, ForeignKey, Integer, Text, Time, UniqueConstraint, text
+from sqlalchemy import (
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Text,
+    Time,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -104,6 +114,15 @@ class Materia(Base):
     requerida_por: Mapped[list["Correlatividad"]] = relationship(
         back_populates="requerida",
         foreign_keys="Correlatividad.materia_requerida",
+    )
+
+    # Día y hora de la mesa de examen. Puede no estar: es un dato que se carga
+    # aparte del plan.
+    mesa: Mapped["MesaMateria | None"] = relationship(
+        back_populates="materia",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
@@ -248,3 +267,57 @@ class Horario(Base):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Horario {self.dia} {self.hora_inicio}-{self.hora_fin} aula={self.aula}>"
+
+
+class MesaMateria(Base):
+    """Día y hora en que se rinde el final de una materia.
+
+    En FRRO la mesa de examen no reparte materias por fecha sino por **día de
+    la semana**: los lunes se rinde Análisis Matemático I, los jueves
+    Simulación. Eso no cambia llamado a llamado, así que el dato cuelga de la
+    materia y no de ``evento_calendario`` —que sabe *qué semana* hay mesa, pero
+    no qué se rinde adentro—. Las dos cosas se cruzan recién en la UI.
+
+    Una fila por materia: el admin corrige el día o la hora y pisa la que
+    había. Las materias sin fila son las que todavía no tienen el dato
+    confirmado, no un "no se rinde".
+
+    ``nota`` es la aclaración por materia ("confirmado con la cátedra el 3/9").
+    El aviso general —esto es referencia, confirmalo con tu cátedra— es de la
+    vista, no del registro.
+    """
+
+    __tablename__ = "mesa_materia"
+    __table_args__ = (
+        UniqueConstraint("materia_codigo", name="uq_mesa_materia_materia"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    materia_codigo: Mapped[str] = mapped_column(
+        Text, ForeignKey("materia.codigo", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: ``lunes``…``viernes``, minúscula y sin acento — el mismo formato que
+    #: ``horario.dia``, así el frontend tiene un solo criterio para los días.
+    dia_semana: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    hora: Mapped[time | None] = mapped_column(Time, nullable=True)
+    nota: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Quién puso el dato: ``seed`` (la planilla del Departamento) o ``admin``.
+    origen: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="seed", index=True
+    )
+    #: El admin que lo tocó. SET NULL: el dato sobrevive a la cuenta, igual que
+    #: en ``estado_dia``.
+    usuario_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("usuario.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    materia: Mapped[Materia] = relationship(back_populates="mesa")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<MesaMateria {self.materia_codigo} {self.dia_semana} {self.hora}>"

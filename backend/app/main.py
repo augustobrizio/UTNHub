@@ -11,6 +11,7 @@ from app.api import (
     chat,
     comisiones,
     materias,
+    mesas,
     notificaciones,
     novedades,
     profesores,
@@ -50,6 +51,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(materias.router)
+app.include_router(mesas.router)
 app.include_router(profesores.router)
 app.include_router(usuario_materia.router)
 app.include_router(calendario.router)
