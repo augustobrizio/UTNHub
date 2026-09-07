@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { AvisoRegistro } from "./AvisoRegistro";
 import { MessageBubble } from "./MessageBubble";
 import { SugerenciasSeguimiento } from "./SugerenciasSeguimiento";
 import { useChat, type MensajeChat } from "./useChat";
@@ -68,11 +69,22 @@ interface Props {
   conversacionId?: number | null;
   /** Mensajes ya guardados, para precargar el hilo. */
   inicial?: MensajeChat[];
+  /** Si hay sesion. Sin cuenta el chat se ve pero no se usa: al intentar enviar
+   *  salta el aviso de registro en vez de pegarle al backend (que daria 401). */
+  autenticado?: boolean;
 }
 
 /** Ventana de chat con el asistente UTNHub (agente + RAG). */
-export function ChatWindow({ conversacionId = null, inicial = [] }: Props) {
+export function ChatWindow({
+  conversacionId = null,
+  inicial = [],
+  autenticado = true,
+}: Props) {
   const router = useRouter();
+  // El aviso "registrate para usar el chatbot" — se abre al intentar enviar sin
+  // sesion. Un visitante puede mirar la interfaz y las sugerencias; recien
+  // cuando manda algo se le pide la cuenta.
+  const [avisoAbierto, setAvisoAbierto] = useState(false);
   const {
     mensajes,
     cargando,
@@ -141,9 +153,20 @@ export function ChatWindow({ conversacionId = null, inicial = [] }: Props) {
     }
   }, [conversacionId, convActivo, cargando, error, router]);
 
+  // Toda salida de mensaje pasa por acá: sin sesión abre el aviso y no manda
+  // nada (devuelve false, así el form no limpia lo que el visitante escribió).
+  const intentarEnviar = (pregunta: string): boolean => {
+    if (!autenticado) {
+      setAvisoAbierto(true);
+      return false;
+    }
+    enviar(pregunta);
+    return true;
+  };
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    enviar(texto);
+    if (!intentarEnviar(texto)) return;
     setTexto("");
     if (inputRef.current) inputRef.current.style.height = "auto";
   };
@@ -213,7 +236,7 @@ export function ChatWindow({ conversacionId = null, inicial = [] }: Props) {
                   <button
                     key={c.categoria}
                     type="button"
-                    onClick={() => enviar(c.pregunta)}
+                    onClick={() => intentarEnviar(c.pregunta)}
                     className={`card-3d card-lift ${ACENTOS[c.color].glow} group flex items-start gap-3 rounded-2xl border border-outline-variant/10 bg-surface-container p-4 text-left ${ACENTOS[c.color].hover} focus-visible:border-primary/50 focus-visible:outline-none`}
                   >
                     <span
@@ -246,7 +269,7 @@ export function ChatWindow({ conversacionId = null, inicial = [] }: Props) {
                 <MessageBubble
                   key={m.id}
                   mensaje={m}
-                  onAccion={enviar}
+                  onAccion={intentarEnviar}
                   onRegenerar={
                     esUltimo && !cargando ? regenerar : undefined
                   }
@@ -254,7 +277,7 @@ export function ChatWindow({ conversacionId = null, inicial = [] }: Props) {
               );
             })}
             {mostrarSeguimiento && (
-              <SugerenciasSeguimiento onElegir={enviar} />
+              <SugerenciasSeguimiento onElegir={intentarEnviar} />
             )}
           </>
         )}
@@ -320,6 +343,11 @@ export function ChatWindow({ conversacionId = null, inicial = [] }: Props) {
           <kbd className="font-sans">Shift + Enter</kbd> para nueva línea
         </p>
       </div>
+
+      <AvisoRegistro
+        abierto={avisoAbierto}
+        onCerrar={() => setAvisoAbierto(false)}
+      />
     </div>
   );
 }

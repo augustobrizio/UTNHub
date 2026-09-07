@@ -1,25 +1,13 @@
 import { ChatWindow } from "@/features/chat/ChatWindow";
-import { RequiereCuenta } from "@/components/RequiereCuenta";
 import { getUsuarioActual } from "@/lib/auth";
 
 /**
- * Chatbot. Necesita cuenta: las conversaciones son de un usuario concreto y el
- * backend valida el token en cada request. Sin sesion mostramos el CTA de
- * `RequiereCuenta` —el mismo de perfil, materias u horarios— en vez de dejar
- * que el visitante choque contra un 401 sin explicacion.
+ * Chatbot. La sección se **ve** sin cuenta —la interfaz, las sugerencias— pero
+ * para **usarla** hace falta registrarse: al enviar sin sesión, el ChatWindow
+ * abre el aviso de registro en vez de pegarle al backend (que daría 401). Por
+ * eso pasamos `autenticado` en vez de cortar con un gate a pantalla completa.
  */
 export default async function ChatPage() {
   const usuario = await getUsuarioActual();
-  if (!usuario) {
-    return (
-      <RequiereCuenta
-        titulo="Chatbot"
-        icono="smart_toy"
-        motivo="El asistente que responde sobre materias, trámites, fechas y novedades con fuentes citadas."
-        next="/chat"
-      />
-    );
-  }
-
-  return <ChatWindow />;
+  return <ChatWindow autenticado={usuario !== null} />;
 }
