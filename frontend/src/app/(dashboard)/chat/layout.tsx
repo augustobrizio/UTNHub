@@ -1,5 +1,6 @@
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { listarConversaciones, type ConversacionOut } from "@/lib/api";
+import { getUsuarioActual } from "@/lib/auth";
 
 /**
  * Layout de la sección chat: panel de historial + la conversación activa.
@@ -14,6 +15,15 @@ export default async function ChatLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Sin cuenta no hay historial que traer (`listarConversaciones` va con token)
+  // ni panel que mostrar: dejamos pasar los children, que son el CTA de
+  // `RequiereCuenta` a pantalla completa. Sin esto, el panel de conversaciones
+  // se filtraba por detras del CTA al visitante sin sesion.
+  const usuario = await getUsuarioActual();
+  if (!usuario) {
+    return <>{children}</>;
+  }
+
   let conversaciones: ConversacionOut[] = [];
   try {
     conversaciones = await listarConversaciones();
