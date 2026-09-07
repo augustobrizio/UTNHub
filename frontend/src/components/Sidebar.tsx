@@ -155,7 +155,7 @@ export function Sidebar({
           // Escritorio: siempre visible, y el ancho lo manda `collapsed`.
           "lg:translate-x-0 lg:w-[var(--sb-w)] lg:transition-[width]",
         ].join(" ")}
-        style={{ "--sb-w": compacto ? "64px" : "256px" } as React.CSSProperties}
+        style={{ "--sb-w": compacto ? "var(--sb-w-closed)" : "var(--sb-w-open)" } as React.CSSProperties}
       >
       {/* Logo — alineado con el TopNav (h-16) */}
       <div className={`flex h-16 shrink-0 items-center border-b border-[var(--shell-border)] ${compacto ? "justify-center px-0" : "gap-3 px-5"}`}>
@@ -189,7 +189,7 @@ export function Sidebar({
               href={item.href}
               className={[
                 "group relative flex items-center gap-3 rounded-lg transition-colors duration-150",
-                compacto ? "justify-center px-0 py-2" : "px-3 py-2",
+                compacto ? "justify-center px-0 py-2 2xl:py-2.5" : "px-3 py-2 2xl:px-3.5 2xl:py-2.5",
                 active
                   ? "bg-[#1CA4DF]/10 text-[var(--shell-accent-fg)]"
                   : "text-[var(--shell-fg-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)]",
@@ -200,10 +200,10 @@ export function Sidebar({
                 <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#1CA4DF]" />
               )}
               <item.icon
-                className="h-[18px] w-[18px] shrink-0"
+                className="h-[18px] w-[18px] shrink-0 2xl:h-5 2xl:w-5"
                 strokeWidth={active ? 2.25 : 1.75}
               />
-              {!compacto && <span className="font-body text-sm font-medium">{item.label}</span>}
+              {!compacto && <span className="font-body text-sm font-medium 2xl:text-[15px]">{item.label}</span>}
               {compacto && <Tooltip label={item.label} />}
             </Link>
           );
@@ -217,15 +217,15 @@ export function Sidebar({
               href={ITEM_ADMIN.href}
               className={[
                 "group relative flex items-center gap-3 rounded-lg transition-colors duration-150",
-                compacto ? "justify-center px-0 py-2" : "px-3 py-2",
+                compacto ? "justify-center px-0 py-2 2xl:py-2.5" : "px-3 py-2 2xl:px-3.5 2xl:py-2.5",
                 isActive(pathname, ITEM_ADMIN.href)
                   ? "bg-[#1CA4DF]/10 text-[var(--shell-accent-fg)]"
                   : "text-[var(--shell-fg-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)]",
               ].join(" ")}
             >
-              <ITEM_ADMIN.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+              <ITEM_ADMIN.icon className="h-[18px] w-[18px] shrink-0 2xl:h-5 2xl:w-5" strokeWidth={1.75} />
               {!compacto && (
-                <span className="font-body text-sm font-medium">{ITEM_ADMIN.label}</span>
+                <span className="font-body text-sm font-medium 2xl:text-[15px]">{ITEM_ADMIN.label}</span>
               )}
               {compacto && <Tooltip label={ITEM_ADMIN.label} />}
             </Link>
@@ -233,15 +233,15 @@ export function Sidebar({
               href="/admin/chatbot"
               className={[
                 "group relative flex items-center gap-3 rounded-lg transition-colors duration-150",
-                compacto ? "justify-center px-0 py-2" : "px-3 py-2",
+                compacto ? "justify-center px-0 py-2 2xl:py-2.5" : "px-3 py-2 2xl:px-3.5 2xl:py-2.5",
                 isActive(pathname, "/admin/chatbot")
                   ? "bg-[#1CA4DF]/10 text-[var(--shell-accent-fg)]"
                   : "text-[var(--shell-fg-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)]",
               ].join(" ")}
             >
-              <Gauge className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+              <Gauge className="h-[18px] w-[18px] shrink-0 2xl:h-5 2xl:w-5" strokeWidth={1.75} />
               {!compacto && (
-                <span className="font-body text-sm font-medium">Huecos del chatbot</span>
+                <span className="font-body text-sm font-medium 2xl:text-[15px]">Huecos del chatbot</span>
               )}
               {compacto && <Tooltip label="Huecos del chatbot" />}
             </Link>
@@ -263,11 +263,11 @@ export function Sidebar({
           ].join(" ")}
         >
           {compacto ? (
-            <PanelLeftOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+            <PanelLeftOpen className="h-[18px] w-[18px] shrink-0 2xl:h-5 2xl:w-5" strokeWidth={1.75} />
           ) : (
-            <PanelLeftClose className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+            <PanelLeftClose className="h-[18px] w-[18px] shrink-0 2xl:h-5 2xl:w-5" strokeWidth={1.75} />
           )}
-          {!compacto && <span className="font-body text-sm font-medium">Colapsar</span>}
+          {!compacto && <span className="font-body text-sm font-medium 2xl:text-[15px]">Colapsar</span>}
           {compacto && <Tooltip label="Expandir menú" />}
         </button>
       </div>
@@ -277,16 +277,16 @@ export function Sidebar({
         {usuario ? (
           <>
             <div className={`group relative flex cursor-pointer items-center gap-3 rounded-lg transition-colors hover:bg-[var(--shell-hover)] ${compacto ? "justify-center px-0 py-2.5" : "px-3 py-2.5"}`}>
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#1CA4DF]/25 bg-[#1CA4DF]/10 font-headline text-xs font-extrabold text-[var(--shell-accent-fg)]">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#1CA4DF]/25 bg-[#1CA4DF]/10 font-headline text-xs font-extrabold text-[var(--shell-accent-fg)] 2xl:h-9 2xl:w-9 2xl:text-[13px]">
                 {usuario.iniciales}
               </div>
               {!compacto && (
                 <>
                   <div className="min-w-0 flex-1 leading-none">
-                    <p className="truncate text-xs font-semibold text-[var(--shell-fg)]">
+                    <p className="truncate text-xs font-semibold text-[var(--shell-fg)] 2xl:text-[13px]">
                       {usuario.nombre}
                     </p>
-                    <p className="mt-0.5 truncate text-[10px] text-[var(--shell-fg-dim)]">
+                    <p className="mt-0.5 truncate text-[10px] text-[var(--shell-fg-dim)] 2xl:text-[11px]">
                       {usuario.detalle}
                     </p>
                   </div>
@@ -310,9 +310,9 @@ export function Sidebar({
                 compacto ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
               ].join(" ")}
             >
-              <LogIn className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+              <LogIn className="h-[18px] w-[18px] shrink-0 2xl:h-5 2xl:w-5" strokeWidth={1.75} />
               {!compacto && (
-                <span className="font-body text-sm font-medium">
+                <span className="font-body text-sm font-medium 2xl:text-[15px]">
                   Iniciar sesión
                 </span>
               )}
@@ -326,8 +326,8 @@ export function Sidebar({
                 href="/register"
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[var(--shell-fg-muted)] transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-fg)]"
               >
-                <UserPlus className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                <span className="font-body text-sm font-medium">
+                <UserPlus className="h-[18px] w-[18px] shrink-0 2xl:h-5 2xl:w-5" strokeWidth={1.75} />
+                <span className="font-body text-sm font-medium 2xl:text-[15px]">
                   Crear cuenta
                 </span>
               </Link>

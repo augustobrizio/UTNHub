@@ -78,9 +78,10 @@ export function TopNav({ usuario }: { usuario: UsuarioMenu | null }) {
             expandida y de 10px colapsada: poco en números, evidente en
             pantalla al ser el mismo isotipo repetido. */}
         <div
+          style={{ "--sb-w": collapsed ? "var(--sb-w-closed)" : "var(--sb-w-open)" } as React.CSSProperties}
           className={[
-            "flex shrink-0 items-center gap-3 transition-[width,padding] duration-200 ease-out",
-            collapsed ? "lg:w-16 lg:justify-center lg:gap-0 lg:px-0" : "lg:w-64 lg:px-5",
+            "flex shrink-0 items-center gap-3 transition-[width,padding] duration-200 ease-out lg:w-[var(--sb-w)]",
+            collapsed ? "lg:justify-center lg:gap-0 lg:px-0" : "lg:px-5",
           ].join(" ")}
         >
           <UtnLogo />

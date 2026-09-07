@@ -18,7 +18,7 @@ export function DashboardMain({ children }: { children: React.ReactNode }) {
   return (
     <main
       className="min-h-screen bg-blueprint pt-16 lg:pl-[var(--sb-w)] lg:transition-[padding] lg:duration-200 lg:ease-out"
-      style={{ "--sb-w": collapsed ? "64px" : "256px" } as React.CSSProperties}
+      style={{ "--sb-w": collapsed ? "var(--sb-w-closed)" : "var(--sb-w-open)" } as React.CSSProperties}
     >
       {children}
     </main>

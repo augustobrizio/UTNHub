@@ -3,6 +3,34 @@
 @tailwind utilities;
 
 /* =====================================================================
+ * Ancho de la barra lateral — adaptativo por tamaño de pantalla.
+ * En una var (y no hardcodeado 256/64px en cada componente) para que
+ * crezca en monitores grandes: en una pantalla de 24" los 256px fijos
+ * dejaban las pestañas diminutas contra tanto vidrio. Sidebar, TopNav
+ * (columna del logo) y DashboardMain (offset del contenido) leen estas
+ * mismas dos medidas via `--sb-w`, así los tres se mueven juntos.
+ * El drawer de mobile no usa esto: va fijo en 256px (ver Sidebar `w-64`).
+ * ===================================================================*/
+:root {
+  --sb-w-open: 256px;
+  --sb-w-closed: 64px;
+}
+/* xl (~1280px, notebooks grandes y monitores) y 2xl (~1536px, 24"+):
+ * la barra y sus pestañas suben de escala en dos saltos. */
+@media (min-width: 1280px) {
+  :root {
+    --sb-w-open: 280px;
+    --sb-w-closed: 68px;
+  }
+}
+@media (min-width: 1536px) {
+  :root {
+    --sb-w-open: 312px;
+    --sb-w-closed: 76px;
+  }
+}
+
+/* =====================================================================
  * Shell "Vercel × UTN" (Sidebar/TopNav/Novedades) — tokens light/dark.
  * Namespace propio (--shell-*), separado de los tokens de Kinetic
  * Blueprint (surface/on-surface) que usan el grafo, materias, horarios y
