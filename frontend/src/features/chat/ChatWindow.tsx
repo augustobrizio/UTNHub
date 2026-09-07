@@ -323,7 +323,7 @@ export function ChatWindow({
             rows={1}
             placeholder="Preguntá sobre la UTN FRRO..."
             aria-label="Escribí tu pregunta"
-            className="card-3d chat-bubble max-h-40 flex-1 resize-none rounded-2xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface placeholder:text-outline/60 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20"
+            className="card-3d chat-bubble sin-scrollbar max-h-40 flex-1 resize-none rounded-2xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface placeholder:text-outline/60 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20"
           />
           <button
             type="submit"
