@@ -2,11 +2,12 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarOff, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { ArrowRight, CalendarOff, ChevronLeft, ChevronRight, Pencil, Users } from "lucide-react";
 
 import type { DiaCursada, SemanaCursada } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { EditorDia } from "./EditorDia";
+import { MesasDelDia } from "./MesasDelDia";
 import { CompartirSemana } from "./CompartirSemana";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
@@ -65,6 +66,8 @@ export function PanelSemanal({
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(false);
   const [editando, setEditando] = useState<DiaCursada | null>(null);
+  // Fecha del día de mesa cuyo detalle se está mirando.
+  const [viendoMesa, setViendoMesa] = useState<string | null>(null);
   // "Hoy" lo dice el backend (hora de Rosario), no el reloj del visitante.
   const hoy = semana.hoy;
 
@@ -217,6 +220,17 @@ export function PanelSemanal({
                         {dia.detalle}
                       </p>
                     )}
+                    {/* Si el día es de mesa, la pregunta que sigue siempre es
+                        "¿mesa de qué?". El detalle se pide al abrirlo. */}
+                    {dia.es_mesa && (
+                      <button
+                        onClick={() => setViendoMesa(dia.fecha)}
+                        className="mt-2 inline-flex items-center gap-1 font-label text-[11px] font-semibold text-[var(--shell-accent-fg)] hover:underline"
+                      >
+                        <Users className="h-3 w-3" strokeWidth={2} />
+                        Qué se rinde
+                      </button>
+                    )}
                   </>
                 )}
 
@@ -232,6 +246,10 @@ export function PanelSemanal({
           );
         })}
       </div>
+
+      {viendoMesa && (
+        <MesasDelDia fecha={viendoMesa} onCerrar={() => setViendoMesa(null)} />
+      )}
 
       {editando && (
         <EditorDia

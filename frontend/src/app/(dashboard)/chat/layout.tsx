@@ -16,12 +16,17 @@ export default async function ChatLayout({
   children: React.ReactNode;
 }) {
   // Sin cuenta no hay historial que traer (`listarConversaciones` va con token)
-  // ni panel que mostrar: dejamos pasar los children, que son el CTA de
-  // `RequiereCuenta` a pantalla completa. Sin esto, el panel de conversaciones
-  // se filtraba por detras del CTA al visitante sin sesion.
+  // ni panel de conversaciones que mostrar: el visitante ve el chat solo, a todo
+  // el ancho. Igual lo envolvemos en el mismo contenedor de alto fijo que la
+  // versión con sesión, si no el ChatWindow (que es `h-full`) se colapsa contra
+  // el alto automático del main.
   const usuario = await getUsuarioActual();
   if (!usuario) {
-    return <>{children}</>;
+    return (
+      <div className="flex h-[calc(100vh-4rem)]">
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    );
   }
 
   let conversaciones: ConversacionOut[] = [];

@@ -11,6 +11,7 @@ import {
   Contact,
   Eye,
   EyeOff,
+  FileText,
   FolderOpen,
   Gauge,
   House,
@@ -63,6 +64,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: "Inicio",       icon: House,        href: "/"          },
   { label: "Chatbot",      icon: Bot,          href: "/chat"      },
   { label: "Calendario",   icon: CalendarDays, href: "/calendario"},
+  { label: "Mesas",        icon: FileText,     href: "/mesas"     },
   { label: "Materias",     icon: Network,      href: "/materias"  },
   { label: "Material",     icon: FolderOpen,   href: "/material"  },
   { label: "Horarios",     icon: Clock,        href: "/horarios"  },
@@ -233,8 +235,22 @@ export function Sidebar({
         ].join(" ")}
         style={{ "--sb-w": compacto ? "var(--sb-w-closed)" : "var(--sb-w-open)" } as React.CSSProperties}
       >
-      {/* Logo — alineado con el TopNav (h-16) */}
-      <div className={`flex h-16 shrink-0 items-center border-b border-[var(--shell-border)] ${compacto ? "justify-center px-0" : "gap-3 px-5"}`}>
+      {/* Logo — alineado con el TopNav (h-16), y link a la portada igual que
+          el de la barra superior: son el mismo isotipo repetido, que uno
+          llevara al inicio y el otro no era justamente la inconsistencia.
+          `closeMobile` explicito porque el drawer se cierra al cambiar de
+          ruta: estando ya en `/` no hay cambio, y sin esto el menu quedaba
+          abierto tapando la portada a la que se acaba de volver. */}
+      <Link
+        href="/"
+        aria-label="Ir al inicio"
+        onClick={closeMobile}
+        className={[
+          "flex h-16 shrink-0 items-center border-b border-[var(--shell-border)] transition-opacity hover:opacity-80",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1CA4DF]/40",
+          compacto ? "justify-center px-0" : "gap-3 px-5",
+        ].join(" ")}
+      >
         <LogoUTNHub size={36} className="shrink-0" />
         {!compacto && (
           <div className="leading-none">
@@ -246,7 +262,7 @@ export function Sidebar({
             </p>
           </div>
         )}
-      </div>
+      </Link>
 
       {/* Navegacion.
           - Colapsada NO recorta overflow, si no los tooltips quedarian

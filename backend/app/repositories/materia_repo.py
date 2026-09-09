@@ -7,16 +7,19 @@ pegado al modelo: nada de lógica de negocio acá.
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from datetime import time
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, case, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.models.academico import (
     CondicionMateria,
     Correlatividad,
     Materia,
+    MesaMateria,
     UsuarioMateria,
 )
+from app.core.plan import DIAS_MESA
 
 
 # ---------------------------------------------------------------------------
@@ -266,3 +269,83 @@ def delete_all_usuario_materias(db: Session, usuario_id: int) -> int:
         db.delete(fila)
     db.flush()
     return len(filas)
+
+
+# ---------------------------------------------------------------------------
+# MesaMateria
+# ---------------------------------------------------------------------------
+def list_mesas(
+    db: Session, *, dia: str | None = None, tipo: str | None = None, anio: int | None = None
+) -> Sequence[MesaMateria]:
+    """Mesas con su materia precargada, ordenadas por día y hora.
+
+    El orden por día sale de un CASE y no del texto: alfabéticamente "jueves"
+    va antes que "lunes", y lo que se muestra es una semana.
+    """
+    orden_dia = case(
+        {d: i for i, d in enumerate(DIAS_MESA)},
+        value=MesaMateria.dia_semana,
+        else_=len(DIAS_MESA),
+    )
+    stmt = (
+        select(MesaMateria)
+        .join(MesaMateria.materia)
+        .options(selectinload(MesaMateria.materia))
+        .order_by(orden_dia, MesaMateria.hora.nulls_last(), Materia.nombre)
+    )
+    if dia is not None:
+        stmt = stmt.where(MesaMateria.dia_semana == dia)
+    if tipo is not None:
+        stmt = stmt.where(Materia.tipo == tipo)
+    if anio is not None:
+        stmt = stmt.where(Materia.anio_carrera == anio)
+    return db.execute(stmt).scalars().all()
+
+
+def codigos_con_mesa(db: Session) -> set[str]:
+    """Códigos que ya tienen mesa cargada. Sólo la columna: se usa para saber
+    qué materias faltan, y traer las filas enteras sería un round-trip caro."""
+    stmt = select(MesaMateria.materia_codigo)
+    return {row[0] for row in db.execute(stmt).all()}
+
+
+def get_mesa(db: Session, materia_codigo: str) -> MesaMateria | None:
+    """La mesa de una materia, o ``None`` si todavía no se cargó."""
+    stmt = (
+        select(MesaMateria)
+        .where(MesaMateria.materia_codigo == materia_codigo)
+        .options(selectinload(MesaMateria.materia))
+    )
+    return db.execute(stmt).scalars().first()
+
+
+def upsert_mesa(
+    db: Session,
+    *,
+    materia_codigo: str,
+    dia_semana: str,
+    hora: time | None,
+    nota: str | None = None,
+    origen: str = "admin",
+    usuario_id: int | None = None,
+) -> MesaMateria:
+    """Fija el día y la hora de una materia. Idempotente por materia."""
+    mesa = get_mesa(db, materia_codigo)
+    if mesa is None:
+        mesa = MesaMateria(materia_codigo=materia_codigo)
+        db.add(mesa)
+    mesa.dia_semana = dia_semana
+    mesa.hora = hora
+    mesa.nota = nota
+    mesa.origen = origen
+    mesa.usuario_id = usuario_id
+    return mesa
+
+
+def eliminar_mesa(db: Session, materia_codigo: str) -> bool:
+    """Saca la mesa de una materia. ``True`` si había algo que borrar."""
+    mesa = get_mesa(db, materia_codigo)
+    if mesa is None:
+        return False
+    db.delete(mesa)
+    return True

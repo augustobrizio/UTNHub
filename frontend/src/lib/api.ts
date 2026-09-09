@@ -19,6 +19,11 @@ import type {
   GrafoResponse,
   MateriaCursableOut,
   MateriaOut,
+  MesaMateria,
+  MesaMateriaIn,
+  MesasSemana,
+  DiaDeMesas,
+  DiaMesa,
   NovedadOut,
   OptimizacionOut,
   PreviewImportSysacad,
@@ -184,6 +189,32 @@ export function getEventosHoyCalendario(
   return request<EventoCalendarioOut[]>(`/calendario/hoy?${qs.toString()}`, {
     revalidate: 0,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Mesas de examen
+// ---------------------------------------------------------------------------
+
+/**
+ * Qué se rinde cada día de la semana.
+ *
+ * Es público y no depende del usuario, así que se cachea como el resto de lo
+ * institucional. Cambia sólo cuando un admin corrige una materia.
+ */
+export function getMesasSemana(params?: {
+  tipo?: TipoMateria;
+  anio?: number;
+}): Promise<MesasSemana> {
+  const qs = new URLSearchParams();
+  if (params?.tipo) qs.set("tipo", params.tipo);
+  if (params?.anio) qs.set("anio", String(params.anio));
+  const cola = qs.toString() ? `?${qs.toString()}` : "";
+  return request<MesasSemana>(`/mesas${cola}`);
+}
+
+/** Las materias que se rinden un día. Lo usa el panel cuando la semana es de mesa. */
+export function getMesasDelDia(dia: DiaMesa): Promise<DiaDeMesas> {
+  return request<DiaDeMesas>(`/mesas/dia/${dia}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -551,6 +582,39 @@ export async function definirEstadoDia(
     throw new ApiError(res.status, body);
   }
   return res.json() as Promise<EstadoDiaOut>;
+}
+
+// ---------------------------------------------------------------------------
+// Mesas de examen (admin)
+// ---------------------------------------------------------------------------
+
+/** Fija el día y la hora en que se rinde una materia. Pisa lo que hubiera. */
+export async function definirMesa(
+  codigo: string,
+  payload: MesaMateriaIn,
+): Promise<MesaMateria> {
+  const res = await fetch(`${MUTATION_BASE}/mesas/${encodeURIComponent(codigo)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignorar */ }
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<MesaMateria>;
+}
+
+/** La materia queda sin día cargado y vuelve a la lista de pendientes. */
+export async function borrarMesa(codigo: string): Promise<void> {
+  const res = await fetch(`${MUTATION_BASE}/mesas/${encodeURIComponent(codigo)}`, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new ApiError(res.status, null);
+  }
 }
 
 /** Saca el override: el día vuelve a lo que diga el calendario. */
@@ -1005,6 +1069,10 @@ export const api = {
   getProximosEventosCalendario,
   getEventosHoyCalendario,
   getSemanaCursada,
+  getMesasSemana,
+  getMesasDelDia,
+  definirMesa,
+  borrarMesa,
   listarNovedades,
   listarCentros,
   getNovedad,

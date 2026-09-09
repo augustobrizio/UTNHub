@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 
 import { ChatWindow } from "@/features/chat/ChatWindow";
 import type { MensajeChat } from "@/features/chat/useChat";
-import { RequiereCuenta } from "@/components/RequiereCuenta";
 import { ApiError, getConversacion } from "@/lib/api";
 import { getUsuarioActual } from "@/lib/auth";
 
@@ -15,19 +14,13 @@ export default async function ConversacionPage({
 }: {
   params: Promise<{ conversacionId: string }>;
 }) {
-  // Necesita cuenta igual que el listado: la conversacion pertenece a un
-  // usuario y `getConversacion` va con token. Sin sesion, el CTA en vez del
-  // 401 —y antes de pedirle nada al backend.
+  // Una conversacion puntual es de un usuario y `getConversacion` va con token.
+  // Sin sesion no la buscamos: mostramos el chat vacio (autenticado=false), que
+  // al enviar dispara el aviso de registro. Asi el visitante ve la seccion en
+  // vez de comerse un 401 o un gate.
   const usuario = await getUsuarioActual();
   if (!usuario) {
-    return (
-      <RequiereCuenta
-        titulo="Chatbot"
-        icono="smart_toy"
-        motivo="El asistente que responde sobre materias, trámites, fechas y novedades con fuentes citadas."
-        next="/chat"
-      />
-    );
+    return <ChatWindow autenticado={false} />;
   }
 
   const { conversacionId } = await params;
