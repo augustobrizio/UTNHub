@@ -14,6 +14,7 @@ import {
   FolderOpen,
   Gauge,
   House,
+  LayoutDashboard,
   LogIn,
   Megaphone,
   Network,
@@ -68,6 +69,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: "Comisiones",   icon: Users,        href: "/comisiones"},
   { label: "Novedades",    icon: Megaphone,    href: "/novedades" },
   { label: "Profesores",   icon: Contact,      href: "/profesores"},
+  { label: "Mi panel",     icon: LayoutDashboard, href: "/panel"   },
   { label: "Perfil",       icon: User,         href: "/perfil"    },
 ] as const;
 

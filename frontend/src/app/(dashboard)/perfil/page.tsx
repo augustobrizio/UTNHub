@@ -1,6 +1,7 @@
+import Link from "next/link";
+
 import { RequiereCuenta } from "@/components/RequiereCuenta";
 import { MisCatedrasCalificar } from "@/components/resenas/MisCatedrasCalificar";
-import { PanelPersonal } from "@/features/panel/PanelPersonal";
 import { getUsuarioActual, iniciales, nombreVisible } from "@/lib/auth";
 
 /**
@@ -100,16 +101,29 @@ export default async function PerfilPage() {
         </p>
       </div>
 
-      {/* Panel personal: progreso, agenda del dia y atajos. Antes era la
-          portada; ahora la portada es publica y esto es lo tuyo. */}
-      <div className="mt-10 border-t border-[var(--shell-border)] pt-2">
-        <PanelPersonal />
-      </div>
+      {/* El dashboard (progreso, agenda, novedades) se mudo a /panel: aca es la
+          cuenta, alla es "como voy". Este atajo hace de puente. */}
+      <Link
+        href="/panel"
+        className="card-3d bg-surface-container/60 border border-outline-variant/10 rounded-2xl px-6 py-5 flex items-center gap-4 mb-6 transition-colors hover:border-primary/30 group"
+      >
+        <div className="icon-chip chip-primary w-11 h-11 rounded-xl flex items-center justify-center text-primary shrink-0">
+          <span className="material-symbols-outlined text-[22px]">dashboard</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold font-headline text-on-surface">Mi panel</p>
+          <p className="text-xs text-on-surface-variant mt-0.5">
+            Tu resumen de cursada: progreso, agenda del dia y lo que se viene.
+          </p>
+        </div>
+        <span className="material-symbols-outlined text-[20px] text-outline/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all">
+          arrow_forward
+        </span>
+      </Link>
 
-      {/* Calificar va ultimo: es lo secundario de esta pantalla —no son datos
-          tuyos, es una contribucion al resto— y arriba de todo empujaba el
-          progreso y la agenda fuera de la vista. */}
-      <div className="mt-10">
+      {/* Calificar: es una contribucion al resto (no son datos tuyos), por eso
+          va ultimo. */}
+      <div className="mt-2">
         <MisCatedrasCalificar />
       </div>
     </div>
