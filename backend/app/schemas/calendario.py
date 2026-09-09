@@ -61,6 +61,11 @@ class DiaCursadaOut(BaseModel):
     #: ``admin`` o ``agente`` si el día tiene override; ``None`` si sale del
     #: calendario. El frontend lo usa para avisar que el dato es manual.
     intervenido_por: str | None = None
+    #: La mesa es *la* razón por la que ese día no se cursa. La decide
+    #: negocio y no el frontend mirando ``eventos``: un feriado encima de la
+    #: mesa deja el día sin mesa. El panel la usa para ofrecer qué materias se
+    #: rinden (``GET /mesas/dia/{dia}``).
+    es_mesa: bool = False
     eventos: list[EventoCalendarioOut] = Field(default_factory=list)
 
 

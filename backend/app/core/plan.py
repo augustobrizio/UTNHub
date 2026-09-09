@@ -18,3 +18,8 @@ HORAS_ELECTIVAS_REQUERIDAS = 20
 # que no cuentan para el total de materias ni para el porcentaje de avance.
 # ADUSI = Seminario Integrador Profesional.
 MATERIAS_OPCIONALES: frozenset[str] = frozenset({"ADUSI"})
+
+# Días en que la facultad toma mesa, en el orden en que se muestra la semana.
+# En FRRO la mesa reparte las materias por día de la semana (los lunes se rinde
+# Análisis Matemático I) y no hay mesa sábado ni domingo.
+DIAS_MESA: tuple[str, ...] = ("lunes", "martes", "miercoles", "jueves", "viernes")

@@ -9,7 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core import ics
-from app.db.models.calendario import EstadoDia, EventoCalendario
+from app.db.models.calendario import (
+    EstadoDia,
+    EventoCalendario,
+    TipoEventoCalendario,
+)
 from app.db.models.usuario import Usuario
 from app.repositories import calendario_repo
 from app.schemas.calendario import (
@@ -216,12 +220,20 @@ def estado_semana(
         # El de mayor prioridad da el motivo; a igual prioridad, el más viejo,
         # que es el que la facultad publicó primero.
         motivo = None
+        # El día es de mesa cuando la mesa es *la* razón por la que no se
+        # cursa. Sale del mismo evento que da el motivo y no de "hay alguna
+        # mesa": un feriado le gana por prioridad justamente porque explica que
+        # ese día tampoco hay mesa. Y sólo cuentan los eventos de la facultad,
+        # que ya es lo único que llega a `bloqueantes`: que el alumno se haya
+        # anotado un final no le pone mesa al día de los demás.
+        es_mesa = False
         if bloqueantes:
             principal = max(
                 bloqueantes,
                 key=lambda e: (_PRIORIDAD_MOTIVO.get(e.tipo, 0), -e.id),
             )
             motivo = principal.titulo
+            es_mesa = principal.tipo == TipoEventoCalendario.MESA.value
         se_cursa = not bloqueantes
         detalle = None
         intervenido = None
@@ -235,6 +247,9 @@ def estado_semana(
             motivo = override.motivo or motivo
             detalle = override.detalle
             intervenido = override.origen
+            # Si el admin devolvió la cursada, la mesa no va: o se levantó o
+            # el calendario la había marcado mal.
+            es_mesa = es_mesa and not override.se_cursa
 
         dias.append(
             DiaCursadaOut(
@@ -243,6 +258,7 @@ def estado_semana(
                 motivo=motivo,
                 detalle=detalle,
                 intervenido_por=intervenido,
+                es_mesa=es_mesa,
                 eventos=[EventoCalendarioOut.model_validate(e) for e in del_dia],
             )
         )

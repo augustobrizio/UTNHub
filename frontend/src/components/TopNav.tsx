@@ -69,7 +69,13 @@ export function TopNav({ usuario }: { usuario: UsuarioMenu | null }) {
           <Menu className="h-5 w-5" strokeWidth={1.75} />
         </button>
 
-        {/* Logo + nombre.
+        {/* Logo + nombre — link a la portada.
+            Es la convencion de cualquier sitio: el logo de la barra vuelve al
+            inicio. La sidebar ya tiene el item "Inicio", pero desde una vista
+            cualquiera —y sobre todo en mobile, donde la barra lateral es un
+            drawer cerrado— el logo era lo unico visible que parecia llevar a
+            casa y no llevaba a ningun lado.
+
             De `lg` para arriba este bloque reproduce exactamente la columna de
             la sidebar —mismo ancho (256/64px) y mismo padding interno (`px-5`
             expandida, centrado colapsada)— para que el isotipo de la barra
@@ -77,10 +83,13 @@ export function TopNav({ usuario }: { usuario: UsuarioMenu | null }) {
             abajo. Con el padding del `<nav>` la diferencia era de 4px
             expandida y de 10px colapsada: poco en números, evidente en
             pantalla al ser el mismo isotipo repetido. */}
-        <div
+        <Link
+          href="/"
+          aria-label="Ir al inicio"
           style={{ "--sb-w": collapsed ? "var(--sb-w-closed)" : "var(--sb-w-open)" } as React.CSSProperties}
           className={[
-            "flex shrink-0 items-center gap-3 transition-[width,padding] duration-200 ease-out lg:w-[var(--sb-w)]",
+            "flex shrink-0 items-center gap-3 rounded-lg transition-[width,padding,opacity] duration-200 ease-out hover:opacity-80 lg:w-[var(--sb-w)]",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1CA4DF]/40",
             collapsed ? "lg:justify-center lg:gap-0 lg:px-0" : "lg:px-5",
           ].join(" ")}
         >
@@ -104,7 +113,7 @@ export function TopNav({ usuario }: { usuario: UsuarioMenu | null }) {
               ISI · UTN FRRO
             </p>
           </div>
-        </div>
+        </Link>
 
         {/* Colapsar la barra lateral — sólo escritorio (en mobile la barra es
             un drawer, con su propio botón hamburguesa). Vive acá, en el borde
